@@ -1,0 +1,2511 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Routine Manager - Patkabari SaaS</title>
+    
+    <!-- LIBRARIES -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf-autotable.umd.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+
+    <style>
+        /* GLOBAL LOADING CSS */
+        .hidden { display: none !important; }
+        #loading-overlay { position: fixed; top:0; left:0; width:100%; height:100%; background: #ffffff; z-index: 99999; display: flex; justify-content: center; align-items: center; flex-direction: column; transition: opacity 0.6s ease; }
+        .logo-spinner-container { position:relative; width:120px; height:120px; margin:0 auto 20px auto; }
+        .logo-spinner { position:absolute; width:100%; height:100%; border:4px solid #f3f3f3; border-top:4px solid #3f51b5; border-radius:50%; animation: spin 1.5s linear infinite; box-sizing: border-box; }
+        .logo-img { width:100px; height:100px; margin:10px; border-radius:50%; object-fit:cover; box-shadow:0 0 15px rgba(0,0,0,0.1); }
+        .welcome-text { color:#3f51b5; font-family:'Segoe UI', sans-serif; margin-top:10px; animation: pulse 1.5s infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        @keyframes pulse { 0% { opacity: 0.6; } 50% { opacity: 1; } 100% { opacity: 0.6; } }
+
+        #subjectContextMenu { 
+            position: fixed; 
+            z-index: 99999 !important;
+            background: white; 
+            border-radius: 8px; 
+            box-shadow: 0 4px 20px rgba(0,0,0,0.25); 
+            padding: 0; 
+            width: 250px; 
+            border: 1px solid #ccc;
+        }
+
+        /* ROUTINE MANAGER CSS */
+        body { height: 100vh; overflow: hidden; background-color: #f3f4f6; display: flex; flex-direction: column; }
+        .palette-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; background-color: #0f172a; padding: 8px; border-radius: 8px; }
+        .draggable-item { padding: 10px; border-radius: 6px; font-size: 0.75rem; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: grab; user-select: none; transition: transform 0.1s, background-color 0.2s; color: #f8fafc; border: 1px solid rgba(255, 255, 255, 0.05); }
+        .draggable-item[data-color="blue"] { background-color: #1e3a8a; border-left: 4px solid #3b82f6; }
+        .draggable-item[data-color="green"] { background-color: #064e3b; border-left: 4px solid #10b981; }
+        .draggable-item[data-color="purple"] { background-color: #581c87; border-left: 4px solid #a855f7; }
+        .draggable-item[data-color="orange"] { background-color: #7c2d12; border-left: 4px solid #f97316; }
+        .draggable-item:active { cursor: grabbing; opacity: 0.6; transform: scale(0.96); }
+        .drop-zone { height: 60px; min-width: 100px; transition: all 0.2s; position: relative; vertical-align: top; background-color: transparent; border: 1px dashed rgba(0, 0, 0, 0.2); border-radius: 6px; }
+        .drop-zone.drag-over { background-color: rgba(14, 165, 233, 0.3); border: 2px dashed #0ea5e9; }
+        
+        .tag { display: block; width: 100%; text-align: center; border-radius: 3px; padding: 1px; margin-bottom: 1px; font-weight: bold; font-size: 0.7rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .tag-class { background: #ffe4e6; color: #9f1239; border: 1px solid #fda4af; }
+        .tag-subject { background: #dcfce7; color: #166534; border: 1px solid #86efac; }
+        .tag-teacher { background: #dbeafe; color: #1e40af; border: 1px solid #93c5fd; } 
+        .active-cell { border: 3px solid #dc2626 !important; background-color: #fee2e2 !important; transform: scale(0.98); }
+        .select-mode-btn-active { background-color: #fef08a !important; color: #854d0e !important; border: 2px solid #ca8a04 !important; }
+        .ghost-item { opacity: 0.7; border: 2px dashed #fca5a5; background-color: #fef2f2; cursor: pointer; height: 100%; width: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; }
+        .ghost-label { color: #dc2626; font-size: 9px; font-weight: 800; text-transform: uppercase; margin-bottom: 2px; }
+
+        .routine-th { position: sticky; top: 0; z-index: 50; background-color: #1f2937; color: white; font-size: 0.8rem; padding: 8px 4px; box-shadow: 0 2px 2px -1px rgba(0,0,0,0.3); }
+        .sticky-col { position: sticky; left: 0; z-index: 40; background-color: white; border-right: 2px solid #e5e7eb; }
+
+        @keyframes slowBlink { 0%, 100% { opacity: 1; transform: scale(1); color: #b91c1c; } 50% { opacity: 0.4; transform: scale(1.25); color: #ef4444; } }
+        .animate-attention { animation: slowBlink 1.5s ease-in-out infinite; }
+        @keyframes scrollText { 0% { transform: translateX(100%); } 100% { transform: translateX(-100%); } }
+        .animate-scroll-slow { display: inline-block; white-space: nowrap; animation: scrollText 12s linear infinite; }
+        .scroll-wrapper { overflow: hidden; white-space: nowrap; width: 100%; max-width: 350px; }
+
+        /* PRINT STYLES - ROBUST SCALING */
+        @media print {
+            @page { size: landscape; margin: 10mm; }
+            .no-print, #mainTopBar, #sidebarPalette, #streakWarningOverlay, #subjectContextMenu, #customStreakModal, #leaveApprovalModal, #debugModal, #extraClassModal { display: none !important; }
+            body { height: auto; overflow: visible; background: white; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            .print-visible { display: block !important; }
+            
+            .routine-print-table { 
+                font-size: 10pt !important; 
+                width: 100% !important; 
+                border-collapse: collapse !important; 
+                color: black; 
+                table-layout: fixed; 
+            }
+            .routine-print-table tr { page-break-inside: avoid; page-break-after: auto; }
+            .routine-print-table th, .routine-print-table td { 
+                border: 1px solid black !important; 
+                padding: 4px; 
+                text-align: center; 
+                color: black !important; 
+                word-wrap: break-word; 
+            }
+            .routine-print-table th { 
+                background-color: #f3f4f6 !important; 
+                font-weight: 900; 
+                text-transform: uppercase; 
+                border-bottom: 2px solid black !important; 
+            }
+        }
+        
+        .tab-btn { cursor: pointer; transition: all 0.2s; }
+        .tab-active { border-bottom: 4px solid #0d9488; color: #0f766e; font-weight: 900; background-color: #f0fdfa; }
+        .tab-inactive { border-bottom: 4px solid transparent; color: #6b7280; font-weight: 700; hover:bg-gray-50; }
+    </style>
+</head>
+<body class="text-gray-800">
+
+    <!-- LOADING OVERLAY -->
+    <div id="loading-overlay">
+        <div style="text-align:center;">
+            <div class="logo-spinner-container">
+                <div class="logo-spinner"></div>
+                <img src="https://raw.githubusercontent.com/mrinmoyedebnath-sys/mylogo/main/STH.png" alt="School Logo" class="logo-img" crossorigin="anonymous">
+            </div>
+            <h2 class="welcome-text">System Initializing...</h2>
+        </div>
+    </div>
+
+    <!-- TOGGLE TOP BAR -->
+    <button onclick="toggleTopBar()" id="topBarToggleBtn" class="absolute top-0 left-1/2 transform -translate-x-1/2 bg-red-600 text-white border border-red-700 border-t-0 rounded-b px-2 py-0.5 shadow-sm z-[200] hover:bg-red-500 transition-all opacity-30 hover:opacity-100 no-print" title="Fold/Unfold Menu">
+        <i class="fas fa-chevron-up text-[10px]"></i>
+    </button>
+
+    <!-- ROUTINE CONTEXT MENU -->
+    <div id="subjectContextMenu" class="hidden fixed bg-white border border-gray-300 shadow-2xl rounded-md z-[100] flex flex-col overflow-hidden">
+        <!-- Context Menu Content Remains the Same -->
+        <div id="contextMenuQuickActions" class="bg-gray-50 border-b border-gray-300 hidden flex-col">
+            <label id="sameAsPrevLabel" class="flex items-center gap-2 cursor-pointer text-xs font-bold text-yellow-800 p-1.5 border-b border-gray-200 hidden hover:bg-yellow-100 transition-colors">
+                <input type="checkbox" id="sameAsPrevCheckbox" onchange="applySameAsPrevious()" class="form-checkbox text-yellow-600 rounded">
+                <span class="whitespace-nowrap">Same as Prev</span>
+                <span id="prevDetailsText" class="text-[9px] font-normal text-yellow-600 ml-auto truncate max-w-[80px]"></span>
+            </label>
+            <label id="bestSuggestionLabel" class="flex items-center gap-2 cursor-pointer text-xs font-bold text-green-800 p-1.5 hidden hover:bg-green-100 transition-colors">
+                <input type="checkbox" id="bestSuggestionCheckbox" onchange="toggleSuggestions()" class="form-checkbox text-green-600 rounded">
+                <span id="suggestionLabelText" class="whitespace-nowrap">💡 Suggestions</span>
+                <span id="suggestionDetailsText" class="text-[9px] font-normal text-green-600 ml-auto truncate"></span>
+            </label>
+        </div>
+        <div class="p-1.5 bg-gray-100 border-b border-gray-300 flex items-center gap-2 shadow-sm z-10">
+            <i class="fas fa-search text-gray-400 text-xs pl-1"></i>
+            <input type="text" id="contextSearch" onkeyup="filterContextMenu()" placeholder="Type to filter..." class="w-full text-xs p-1 bg-transparent outline-none text-gray-700 font-bold">
+        </div>
+        <div class="flex flex-row relative">
+            <div class="flex flex-col border-r border-gray-200 w-36">
+                <div id="contextMenuHeaderPrimary" class="px-3 py-2 bg-red-50 text-[10px] font-black text-red-800 uppercase border-b border-red-100 shadow-sm flex items-center justify-between">
+                    <span id="contextMenuTitlePrimary">Class</span><i class="fas fa-users"></i>
+                </div>
+                <div id="contextMenuListPrimary" class="max-h-60 overflow-y-auto no-scrollbar py-1"></div>
+            </div>
+            <div class="flex flex-col w-36 bg-gray-50">
+                <div class="px-3 py-2 bg-green-50 text-[10px] font-black text-green-800 uppercase border-b border-green-100 shadow-sm flex items-center justify-between">
+                    <span>Subject</span><i class="fas fa-book"></i>
+                </div>
+                <div id="contextMenuListSubject" class="max-h-60 overflow-y-auto no-scrollbar py-1"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- CUSTOM STREAK WARNING MODAL -->
+    <div id="customStreakModal" class="fixed inset-0 bg-gray-900 bg-opacity-80 z-[999999] hidden flex items-center justify-center p-4">
+        <!-- Streak Modal Content Remains the Same -->
+        <div class="bg-white rounded-lg shadow-2xl w-full max-w-md overflow-hidden transform scale-100 transition-transform">
+            <div class="bg-red-600 text-white p-4 flex items-center gap-3 border-b-4 border-red-800">
+                <i class="fas fa-exclamation-triangle text-3xl animate-pulse"></i>
+                <div><h2 class="font-black text-lg uppercase tracking-wider">Workload Warning</h2></div>
+            </div>
+            <div class="p-5"><p id="customStreakMessage" class="text-gray-700 font-medium text-sm"></p></div>
+            <div class="p-4 bg-gray-50 border-t flex justify-end gap-3">
+                <button onclick="resolveStreakWarning(false)" class="px-4 py-2 font-bold text-gray-700 border border-gray-300 bg-white rounded shadow-sm hover:bg-gray-100 transition-colors">Don't Assign</button>
+                <button onclick="resolveStreakWarning(true)" class="px-4 py-2 font-bold text-white bg-red-600 rounded shadow-md hover:bg-red-700 transition-colors">Ignore & Assign</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- STREAK WARNING OVERLAY -->
+    <div id="streakWarningOverlay" class="fixed top-20 right-4 bg-red-600 text-white px-4 py-3 rounded shadow-2xl z-[100] transition-transform duration-300 transform translate-x-[150%] flex items-center gap-3 border-l-4 border-black">
+        <i class="fas fa-exclamation-triangle text-2xl animate-pulse"></i>
+        <div><h4 class="font-bold text-sm">Continuous Workload Overview</h4><p id="streakWarningText" class="text-xs font-medium"></p></div>
+        <button onclick="document.getElementById('streakWarningOverlay').classList.replace('translate-x-0', 'translate-x-[150%]')" class="ml-2 text-xl font-bold hover:text-red-200 focus:outline-none">&times;</button>
+    </div>
+
+    <!-- ROUTINE HEADER -->
+    <div id="mainTopBar" class="bg-white shadow-md p-2 flex flex-col md:flex-row justify-between items-center z-50 gap-2 shrink-0 no-print">
+        <div class="flex items-center gap-2 w-full md:w-auto justify-between">
+            <div class="flex items-center gap-2">
+                <h1 id="app-title" class="text-sm font-bold text-gray-800 leading-tight">Routine Manager<br><span class="text-blue-600 text-xs">Patkabari High School</span></h1>
+            </div>
+            <div class="flex gap-2 items-center">
+                <div class="flex items-center gap-1 bg-blue-50 p-1 rounded border border-blue-100">
+                    <label class="text-xs font-bold text-blue-800 uppercase px-1">Day:</label>
+                    <select id="daySelect" class="bg-white border border-blue-300 text-blue-800 text-sm font-bold rounded outline-none" onchange="clearHistory(); renderGrid()">
+                        <option>Monday</option><option>Tuesday</option><option>Wednesday</option>
+                        <option>Thursday</option><option>Friday</option><option>Saturday</option>
+                    </select>
+                </div>
+                <div class="flex items-center gap-1 bg-yellow-50 p-1 rounded border border-yellow-200">
+                    <label class="text-xs font-bold text-yellow-800 uppercase px-1">View:</label>
+                    <select id="viewMode" class="bg-white border border-yellow-300 text-yellow-900 text-sm font-bold rounded outline-none" onchange="clearHistory(); refreshView()">
+                        <option value="teacher">Teachers</option><option value="class">Classes</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+        <div class="flex gap-2 overflow-x-auto w-full md:w-auto no-scrollbar pb-1">
+            <a href="home.html" class="bg-gray-600 hover:bg-gray-700 text-white px-3 py-1 rounded shadow font-bold text-sm flex items-center gap-2 whitespace-nowrap"><i class="fas fa-home"></i> <span>Hub</span></a>
+            <button onclick="printMasterRoutine()" class="bg-orange-600 hover:bg-orange-700 text-white px-3 py-1 rounded shadow font-bold text-sm flex items-center gap-2 whitespace-nowrap"><i class="fas fa-list-alt"></i> <span>Master</span></button>
+            <button id="btnPortalToggle" onclick="toggleTeacherPortal()" class="bg-gray-800 text-white hover:bg-black px-3 py-1 rounded shadow font-bold text-sm flex items-center gap-2 whitespace-nowrap"><i class="fas fa-toggle-off text-red-400"></i> <span id="portalToggleText">Portal: Locked</span></button>
+            <button onclick="openSubstitutionModal()" class="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded shadow font-bold text-sm flex items-center gap-2 animate-pulse whitespace-nowrap"><i class="fas fa-user-clock"></i> <span>Provisional</span></button>
+            <button onclick="openLeaveApprovalModal()" class="relative bg-teal-600 hover:bg-teal-700 text-white px-3 py-1 rounded shadow font-bold text-sm flex items-center gap-2 whitespace-nowrap"><i class="fas fa-envelope-open-text"></i> <span>Leaves</span><span id="leaveBadge" class="absolute -top-2 -right-2 bg-red-600 text-white text-[10px] font-black px-1.5 py-0.5 rounded-full shadow hidden border border-white">0</span></button>
+            <button onclick="openReportModal()" class="bg-purple-600 hover:bg-purple-700 text-white px-3 py-1 rounded shadow font-bold text-sm flex items-center gap-2 whitespace-nowrap"><i class="fas fa-print"></i> <span>Reports</span></button>
+            
+            <button onclick="debugFetchExamDB()" class="bg-purple-700 hover:bg-purple-600 text-white px-3 py-1 rounded shadow font-bold text-sm flex items-center gap-2 whitespace-nowrap">
+                <i class="fas fa-database"></i> <span>View Exam_DB</span>
+            </button>
+
+
+            <!-- AUTO GEN & CLEAR DAY BUTTONS -->
+            <button onclick="openAutoGenModal()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1 rounded shadow font-bold text-sm flex items-center gap-2 whitespace-nowrap">
+                <i class="fas fa-magic"></i> <span>Auto Gen</span>
+            </button>
+            <button onclick="clearCurrentDay()" class="bg-red-100 text-red-800 hover:bg-red-200 border border-red-300 px-3 py-1 rounded shadow font-bold text-sm flex items-center gap-2 whitespace-nowrap">
+                <i class="fas fa-trash-alt"></i> <span>Clear Day</span>
+            </button>
+
+
+
+
+
+
+            <button id="btnSelectMode" onclick="toggleSelectMode()" class="bg-gray-200 text-gray-700 hover:bg-gray-300 border border-gray-400 px-3 py-1 rounded shadow font-bold text-sm flex items-center gap-2 whitespace-nowrap"><i class="fas fa-mouse-pointer"></i> <span>Select</span></button>
+            <button onclick="deleteSelectedCell()" class="bg-red-800 hover:bg-red-900 text-white px-3 py-1 rounded shadow font-bold text-sm flex items-center gap-2 whitespace-nowrap"><i class="fas fa-eraser"></i> <span>Delete</span></button>
+            <button onclick="saveCurrentDay()" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded shadow font-bold text-sm flex items-center gap-2 whitespace-nowrap"><span>Save</span></button>
+            <button onclick="openTimeScheduleModal()" class="bg-amber-600 hover:bg-amber-700 text-white px-3 py-1 rounded shadow font-bold text-sm flex items-center gap-2 whitespace-nowrap"><i class="fas fa-clock"></i> <span>Timings</span></button>
+        </div>
+    </div>
+
+    <!-- ROUTINE MAIN CONTENT (SIDEBAR + GRID) -->
+    <div class="flex flex-1 overflow-hidden no-print">
+        <div id="sidebarPalette" class="w-52 bg-white border-r overflow-x-hidden overflow-y-auto p-2 flex flex-col gap-4 shadow-xl z-20 shrink-0 transition-all duration-300 whitespace-nowrap">
+            <div class="border-b pb-2 flex justify-between items-center">
+                <h3 class="font-bold text-gray-700 text-[10px] uppercase">Palette</h3>
+                <button onclick="quickAdd('teacher')" class="bg-blue-100 text-blue-700 text-[10px] px-2 rounded hover:bg-blue-200">+ New</button>
+            </div>
+
+            <div>
+                <div class="flex justify-between items-center mb-1">
+                    <h3 class="font-bold text-red-700 text-[10px] uppercase" id="list1Header">CLASSES</h3>
+                    <button id="list1AddBtn" onclick="quickAdd('class')" class="text-red-500 text-[10px] hover:underline">+ New</button>
+                </div>
+                <div id="classList" class="palette-grid" data-color="purple"></div>
+            </div>
+            <div>
+                <div class="flex justify-between items-center mb-1">
+                    <h3 class="font-bold text-green-700 text-[10px] uppercase">Subjects</h3>
+                    <button onclick="quickAdd('subject')" class="text-green-500 text-[10px] hover:underline">+ New</button>
+                </div>
+                <div id="subjectList" class="palette-grid" data-color="blue"></div>
+            </div>
+        </div>
+
+        <div class="flex-1 flex flex-col bg-gray-50 p-2 overflow-hidden">
+            <div class="flex items-center gap-2 mb-2 shrink-0">
+                <div class="flex items-center gap-1 ml-1 border-l pl-2 border-gray-300">
+                    <button onclick="undo()" class="bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-300 px-2 py-1 rounded shadow text-sm transition"><i class="fas fa-undo"></i></button>
+                    <button onclick="redo()" class="bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-300 px-2 py-1 rounded shadow text-sm transition"><i class="fas fa-redo"></i></button>
+                    <button onclick="toggleSidebar()" class="bg-indigo-100 text-indigo-700 border border-indigo-300 px-2 py-1 rounded shadow text-sm ml-1"><i id="sidebarToggleIcon" class="fas fa-chevron-left"></i></button>
+                </div>
+
+                <div class="flex-1 bg-white border border-blue-300 rounded shadow-sm py-1.5 px-2 overflow-hidden flex items-center">
+                    <i class="fas fa-mouse-pointer text-blue-600 mr-2 text-[10px]"></i>
+                    <div class="scroll-wrapper w-full"><span class="animate-scroll-slow text-[10px] font-bold text-gray-700 uppercase">Right click on cells to input data • Use Select Mode to delete cells • Save your progress!</span></div>
+                    <span id="tickerDayDisplay" class="bg-blue-100 text-blue-800 text-[10px] font-black px-2 py-0.5 rounded border border-blue-200 ml-2 uppercase">Monday</span>
+                </div>
+                <label class="flex items-center gap-1 text-[10px] font-bold text-gray-500 cursor-pointer bg-white px-2 py-1.5 rounded border border-gray-300 shadow-sm whitespace-nowrap">
+                    <input type="checkbox" id="ghostToggle" checked onchange="renderGrid()" class="form-checkbox h-3 w-3 text-red-600"> Show Ghost Mode
+                </label>
+            </div>
+            
+            <div id="gridContainer" class="flex-1 overflow-auto bg-white shadow rounded border border-gray-200 relative">
+                <table class="w-full border-collapse">
+                    <thead>
+                        <tr>
+                            <th class="routine-th text-left border-b sticky-col" style="color: #8f0117; background-color: white; font-size:22px;">Row</th>
+                            <th class="routine-th border-l border-gray-600">1st</th><th class="routine-th border-l border-gray-600">2nd</th><th class="routine-th border-l border-gray-600">3rd</th><th class="routine-th border-l border-gray-600">4th</th><th class="routine-th border-l border-gray-600">5th</th><th class="routine-th border-l border-gray-600">6th</th><th class="routine-th border-l border-gray-600">7th</th><th class="routine-th border-l border-gray-600">8th</th>
+                        </tr>
+                    </thead>
+                    <tbody id="gridBody"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- PROVISIONAL MODAL -->
+    <div id="substitutionModal" class="fixed inset-0 bg-gray-900 bg-opacity-95 z-[70] hidden flex flex-col p-2 md:p-4 no-print">
+        <div class="bg-white rounded-lg shadow-2xl flex-1 flex flex-col overflow-hidden w-full max-w-6xl mx-auto">
+            <div class="bg-red-800 text-white p-3 flex justify-between items-center shrink-0">
+                <h2 class="text-base md:text-lg font-bold"><i class="fas fa-clipboard-list"></i> Provisional Slip</h2>
+                <div class="flex items-center gap-3">
+                    <!-- NEW EXTRA CLASS BUTTON -->
+                    <button onclick="openExtraClassModal()" class="bg-red-900 hover:bg-red-700 text-white px-3 py-1 rounded border border-red-500 shadow text-xs font-black transition-colors"><i class="fas fa-chart-bar"></i> Extra Class Log</button>
+                    <button onclick="document.getElementById('substitutionModal').classList.add('hidden')" class="text-white text-xl px-2 hover:text-red-200">&times;</button>
+                </div>
+            </div>
+            <div class="flex flex-col md:flex-row flex-1 overflow-hidden">
+                <div class="w-full md:w-1/4 border-r p-3 overflow-y-auto bg-gray-50 shrink-0">
+                    <h3 class="font-bold text-gray-700 mb-2 uppercase text-xs">1. Mark Absentees</h3>
+                    <div id="absenteeList" class="grid grid-cols-2 md:grid-cols-1 gap-1"></div>
+                </div>
+                <div class="flex-1 p-3 overflow-y-auto bg-white flex flex-col">
+                    <div class="flex justify-between items-center mb-3 shrink-0">
+                        <h3 class="font-bold text-gray-700 uppercase text-xs">2. Assign Substitutes</h3>
+                        <div class="flex gap-2">
+                            <label class="flex items-center gap-1 cursor-pointer text-[10px] font-bold text-green-800 bg-green-50 px-2 py-1 rounded border border-green-200 shadow-sm"><input type="checkbox" id="sortProxyCheckbox" onchange="renderSubstitutionTable()" class="form-checkbox text-green-600 rounded">💡 Sort Load</label>
+                            <button onclick="openExclusionModal()" class="text-[10px] font-bold text-red-800 bg-red-50 px-2 py-1 rounded border border-red-200"><i class="fas fa-user-slash"></i> Don't Pick</button>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-3 mb-3 bg-gray-50 p-2 rounded border border-gray-200 shrink-0">
+                        <input type="date" id="provisionalDate" onchange="handleProvisionalDateChange()" class="border p-1 rounded text-xs font-bold text-gray-700 shadow-sm">
+                        <button onclick="reloadAbsentees()" class="bg-red-100 text-red-700 p-1.5 rounded"><i class="fas fa-sync-alt"></i></button>
+                        <select id="provisionalDaySelect" onchange="renderSubstitutionTable()" class="border p-1 rounded text-xs w-28 font-bold text-gray-700 shadow-sm"><option>Monday</option><option>Tuesday</option><option>Wednesday</option><option>Thursday</option><option>Friday</option><option>Saturday</option></select> 
+                    </div>
+                    <div class="overflow-x-auto border rounded mb-2 shadow-sm">
+                        <table class="w-full border-collapse text-xs min-w-[500px]">
+                            <thead class="bg-gray-100 sticky top-0 border-b-2 border-gray-300">
+                                <tr>
+                                    <th class="border-r p-2"><input type="checkbox" checked onchange="toggleAllAutoCb(this)" class="form-checkbox text-indigo-600 rounded mr-1" title="Select/Deselect All"> Pd</th>
+                                    <th class="border-r p-2 text-left">Class</th>
+                                    <th class="border-r p-2 text-left">Subject</th>
+                                    <th class="border-r p-2 text-left">Absent Teacher</th>
+                                    <th class="p-2 text-left">Assign Substitute</th>
+                                </tr>
+                            </thead>
+                            <tbody id="substitutionTableBody"></tbody>
+                        </table>
+                    </div>
+                    <div class="mt-auto pt-2 flex justify-between gap-2 border-t flex-wrap">
+                        <div class="flex items-center gap-2">
+                            <select id="autoAssignScope" class="border border-indigo-300 bg-indigo-50 text-indigo-900 p-1.5 rounded text-xs font-bold outline-none cursor-pointer">
+                                <option value="ALL">Auto: All Periods</option>
+                                <option value="TIFFIN">Auto: Up to Tiffin Break</option>
+                                <option value="1">Up to 1st Period</option>
+                                <option value="2">Up to 2nd Period</option>
+                                <option value="3">Up to 3rd Period</option>
+                                <option value="4">Up to 4th Period</option>
+                                <option value="5">Up to 5th Period</option>
+                                <option value="6">Up to 6th Period</option>
+                                <option value="7">Up to 7th Period</option>
+                            </select>
+                            <button onclick="autoAssignSubstitutes()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded font-bold text-xs shadow"><i class="fas fa-magic"></i> Run</button>
+                        </div>
+                        <div class="flex gap-2 ml-auto">
+                            <button onclick="resetProvisionalAssignments()" class="bg-gray-100 text-gray-700 hover:bg-gray-200 px-3 py-1.5 rounded font-bold text-xs border border-gray-300"><i class="fas fa-eraser"></i> Reset</button>
+                            <button onclick="document.getElementById('substitutionModal').classList.add('hidden')" class="px-4 py-1.5 text-xs font-bold text-gray-600 border rounded">Close</button>
+                            <button onclick="saveAndPrintSubstitution()" class="bg-black text-white hover:bg-gray-800 px-4 py-1.5 rounded font-bold text-xs shadow"><i class="fas fa-print"></i> Save & Print</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- NEW: EXTRA CLASS LOG MODAL -->
+    <div id="extraClassModal" class="fixed inset-0 bg-gray-900 bg-opacity-90 z-[80] hidden flex justify-center items-center p-4 no-print">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-2xl flex flex-col max-h-[85vh] overflow-hidden border border-red-200">
+            <div class="bg-red-800 text-white p-4 flex justify-between items-center shrink-0">
+                <h2 class="text-lg font-black"><i class="fas fa-chart-line mr-2"></i> Staff Extra Class Register</h2>
+                <button onclick="document.getElementById('extraClassModal').classList.add('hidden')" class="text-red-200 hover:text-white text-2xl transition-colors">&times;</button>
+            </div>
+            <div class="p-4 bg-red-50 border-b border-red-100 flex flex-wrap gap-4 items-end shrink-0">
+                <div>
+                    <label class="block text-[10px] font-black text-red-800 uppercase mb-1">Start Date</label>
+                    <input type="date" id="extraClassStart" class="p-2 border border-red-300 rounded text-sm font-bold shadow-sm outline-none">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-black text-red-800 uppercase mb-1">End Date</label>
+                    <input type="date" id="extraClassEnd" class="p-2 border border-red-300 rounded text-sm font-bold shadow-sm outline-none">
+                </div>
+                <button onclick="generateExtraClassReport()" class="bg-red-700 hover:bg-red-600 text-white px-5 py-2 rounded shadow font-bold text-sm transition-colors h-[38px]"><i class="fas fa-search mr-1"></i> Calculate</button>
+            </div>
+            <div class="flex-1 overflow-y-auto bg-white p-4">
+                <table class="w-full text-sm border-collapse text-left">
+                    <thead class="bg-gray-100 text-gray-700 sticky top-0">
+                        <tr>
+                            <th class="p-3 border-b-2 border-gray-300">Teacher Name</th>
+                            <th class="p-3 border-b-2 border-gray-300 text-center">Extra Classes Taken</th>
+                        </tr>
+                    </thead>
+                    <tbody id="extraClassBody">
+                        <tr><td colspan="2" class="p-6 text-center text-gray-400 italic">Select dates and click Calculate</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- LEAVE APPROVAL OVERLAY MODAL (NOW WITH PROPER TABS) -->
+    <div id="leaveApprovalModal" class="fixed inset-0 bg-gray-900 bg-opacity-90 z-[85] hidden flex justify-center items-center p-4 no-print">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-4xl flex flex-col h-[85vh] overflow-hidden">
+            <div class="bg-teal-700 text-white p-4 flex justify-between items-center shrink-0">
+                <h2 class="text-lg font-bold"><i class="fas fa-envelope-open-text mr-2"></i> Leave Management Hub</h2>
+                <button onclick="closeLeaveApprovalModal()" class="text-teal-200 hover:text-white text-2xl transition-colors">&times;</button>
+            </div>
+            
+            <!-- NEW TAB NAV -->
+            <div class="flex border-b border-gray-200 bg-gray-100 shrink-0">
+                <button id="tab-leave-pending" onclick="switchLeaveTab('pending')" class="tab-btn tab-active flex-1 py-3 px-2 text-xs uppercase text-center"><i class="fas fa-clock mr-1"></i> Pending Approvals</button>
+                <button id="tab-leave-history" onclick="switchLeaveTab('history')" class="tab-btn tab-inactive flex-1 py-3 px-2 text-xs uppercase text-center"><i class="fas fa-list-ul mr-1"></i> History Log</button>
+                <button id="tab-leave-register" onclick="switchLeaveTab('register')" class="tab-btn tab-inactive flex-1 py-3 px-2 text-xs uppercase text-center"><i class="fas fa-book mr-1"></i> Leave Register</button>
+            </div>
+            
+            <div class="flex flex-col flex-1 overflow-hidden bg-gray-50 relative">
+                
+                <!-- VIEW 1: PENDING -->
+                <div id="view-leave-pending" class="absolute inset-0 overflow-y-auto p-4">
+                    <div class="bg-white border rounded shadow-sm overflow-hidden">
+                        <table class="w-full text-xs text-left">
+                            <thead class="bg-gray-100 text-gray-600 border-b border-gray-200">
+                                <tr>
+                                    <th class="p-3">Teacher</th>
+                                    <th class="p-3">Type / Reason</th>
+                                    <th class="p-3">Date Range</th>
+                                    <th class="p-3 text-center">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="leaveApprovalBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- VIEW 2: HISTORY -->
+                <div id="view-leave-history" class="absolute inset-0 overflow-y-auto p-4 hidden">
+                    <div class="bg-white border rounded shadow-sm overflow-hidden">
+                        <table class="w-full text-xs text-left">
+                            <thead class="bg-gray-100 text-gray-600 border-b border-gray-200">
+                                <tr>
+                                    <th class="p-3">Teacher</th>
+                                    <th class="p-3">Reason</th>
+                                    <th class="p-3">Date Range</th>
+                                    <th class="p-3 text-center">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="leaveHistoryBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- VIEW 3: REGISTER -->
+                <div id="view-leave-register" class="absolute inset-0 flex flex-col hidden">
+                    <div class="p-4 bg-teal-50 border-b border-teal-100 flex flex-wrap gap-4 items-end shrink-0">
+                        <div>
+                            <label class="block text-[10px] font-black text-teal-800 uppercase mb-1">Start Date</label>
+                            <input type="date" id="leaveRegStart" class="p-2 border border-teal-300 rounded text-sm font-bold shadow-sm outline-none bg-white">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-black text-teal-800 uppercase mb-1">End Date</label>
+                            <input type="date" id="leaveRegEnd" class="p-2 border border-teal-300 rounded text-sm font-bold shadow-sm outline-none bg-white">
+                        </div>
+                        <button onclick="generateLeaveRegister()" class="bg-teal-700 hover:bg-teal-600 text-white px-5 py-2 rounded shadow font-bold text-sm transition-colors h-[38px]"><i class="fas fa-file-invoice mr-1"></i> Build Register</button>
+                    </div>
+                    <div class="flex-1 overflow-y-auto bg-white p-4">
+                        <table class="w-full text-xs border-collapse text-left">
+                            <thead class="bg-gray-100 text-gray-700 sticky top-0">
+                                <tr>
+                                    <th class="p-3 border-b-2 border-gray-300">Teacher Name</th>
+                                    <th class="p-3 border-b-2 border-gray-300 text-center w-24">Days Taken</th>
+                                    <th class="p-3 border-b-2 border-gray-300">Approved Dates & Reasons</th>
+                                </tr>
+                            </thead>
+                            <tbody id="leaveRegisterBody">
+                                <tr><td colspan="3" class="p-6 text-center text-gray-400 italic">Select a date range and click Build Register to view approved leaves.</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+            </div>
+            <div class="p-3 bg-gray-100 border-t flex justify-end shrink-0">
+                <button onclick="closeLeaveApprovalModal()" class="px-5 py-2 font-bold text-gray-700 bg-white border border-gray-300 rounded shadow hover:bg-gray-50 transition-colors">Close Hub</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- REPORTS MODAL -->
+    <div id="reportModal" class="fixed inset-0 bg-black bg-opacity-60 z-[60] hidden flex items-center justify-center no-print">
+        <!-- ... [Content Remains the Same] ... -->
+        <div class="bg-white rounded-lg p-6 w-80 border-t-4 border-purple-600">
+            <h2 class="text-lg font-bold mb-4 text-purple-900">Generate Report</h2>
+            <select id="reportType" onchange="updateReportDropdown()" class="w-full border p-2 rounded mb-3"><option value="class">Class Routine</option><option value="teacher">Teacher Routine</option></select>
+            <select id="reportTarget" class="w-full border p-2 rounded mb-4"></select>
+            <div class="flex justify-end gap-2"><button onclick="document.getElementById('reportModal').classList.add('hidden')" class="px-3 py-1 rounded hover:bg-gray-100">Cancel</button><button onclick="generateAndPrint()" class="px-4 py-2 bg-purple-600 text-white rounded font-bold hover:bg-purple-700 shadow">Print View</button></div>
+        </div>
+    </div>
+
+    <!-- EXCLUSION MODAL -->
+    <div id="exclusionModal" class="fixed inset-0 bg-gray-900 bg-opacity-80 z-[80] hidden flex justify-center items-center p-4 no-print">
+        <!-- ... [Content Remains the Same] ... -->
+        <div class="bg-white rounded-lg shadow-2xl w-full max-w-sm overflow-hidden flex flex-col max-h-[80vh]">
+            <div class="bg-red-800 text-white p-3 flex justify-between items-center shrink-0">
+                <h2 class="font-bold text-sm uppercase"><i class="fas fa-user-slash"></i> Exclude Teachers</h2>
+                <button onclick="closeExclusionModal()" class="text-white text-xl px-2 hover:text-red-200 transition-colors">&times;</button>
+            </div>
+            <div class="p-3 bg-red-50 border-b border-red-200 text-xs text-red-800 font-medium"><i class="fas fa-info-circle"></i> Checked teachers will not be auto-assigned and will be hidden from the provisional substitute list.</div>
+            <div id="exclusionListContainer" class="p-0 flex-1 overflow-y-auto bg-white"></div>
+            <div class="p-3 bg-gray-100 border-t flex justify-end"><button onclick="closeExclusionModal()" class="bg-gray-800 hover:bg-black text-white px-5 py-2 rounded font-bold text-xs shadow transition-colors">Done</button></div>
+        </div>
+    </div>
+
+    <!-- TIMINGS MODAL -->
+    <div id="timeScheduleModal" class="fixed inset-0 bg-gray-900 bg-opacity-80 z-[80] hidden flex justify-center items-center p-4 no-print">
+        <!-- ... [Content Remains the Same] ... -->
+        <div class="bg-white rounded-lg shadow-2xl w-full max-w-md overflow-hidden flex flex-col">
+            <div class="bg-amber-600 text-white p-3 flex justify-between items-center"><h2 class="font-bold"><i class="fas fa-clock"></i> Timings & Tiffin Config</h2><button onclick="closeTimeScheduleModal()" class="text-white text-xl px-2">&times;</button></div>
+            <div class="p-4 flex-1 overflow-y-auto">
+                <div class="mb-4"><label class="block text-xs font-bold text-gray-700 mb-1">Select Day:</label><select id="modalDaySelect" onchange="loadDayTimingsIntoModal()" class="w-full border border-gray-300 p-2 rounded text-sm font-bold bg-gray-50"><option>Monday</option><option>Tuesday</option><option>Wednesday</option><option>Thursday</option><option>Friday</option><option>Saturday</option></select></div>
+                <div class="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg"><label class="block text-xs font-black text-amber-900 mb-1">🍔 Tiffin Break Occurs After:</label><select id="tiffinPeriodSelect" class="w-full border border-amber-300 p-2 rounded text-sm font-bold bg-white text-amber-800"><option value="1st">1st Period</option><option value="2nd">2nd Period</option><option value="3rd">3rd Period</option><option value="4th" selected>4th Period</option><option value="5th">5th Period</option><option value="6th">6th Period</option><option value="7th">7th Period</option></select><p class="text-[10px] text-amber-700 mt-1 italic">A 3-class streak is forgiven if this break falls in the middle.</p></div>
+                <h3 class="text-xs font-bold text-gray-700 mb-2 border-b pb-1">Period Timings (Optional)</h3><div id="modalTimeRowsContainer" class="flex flex-col gap-2"></div>
+            </div>
+            <div class="p-3 bg-gray-100 border-t flex justify-end gap-2"><button onclick="closeTimeScheduleModal()" class="px-4 py-2 text-xs font-bold text-gray-600 border rounded bg-white">Cancel</button><button onclick="saveModalTimings()" class="bg-amber-600 text-white px-4 py-2 rounded font-bold text-xs shadow">Save Timings</button></div>
+        </div>
+    </div>
+
+    <!-- DB DEBUG MODAL -->
+    <div id="debugModal" class="fixed inset-0 bg-slate-900/80 z-[9999999] hidden flex justify-center items-center p-4 backdrop-blur-sm no-print">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-5xl flex flex-col h-[90vh] overflow-hidden border border-slate-200">
+            <div class="px-6 py-4 border-b border-slate-200 flex justify-between items-center bg-purple-50 shrink-0"><h2 class="text-xl font-black text-purple-900"><i class="fas fa-database mr-2"></i> exam_db Contents (Live)</h2><button onclick="document.getElementById('debugModal').classList.add('hidden')" class="text-purple-400 hover:text-red-600 focus:outline-none"><i class="fas fa-times text-2xl"></i></button></div>
+            <div class="p-4 overflow-y-auto flex-1 bg-slate-800 text-green-400 font-mono text-xs text-left"><pre id="debugOutput">Loading...</pre></div>
+        </div>
+    </div>
+
+    <!-- PRINT OUTPUT AREAS -->
+    <div id="printArea" class="hidden">
+        <div class="print-header-container text-center mb-4"><h2 id="printHeader" class="text-2xl font-bold uppercase">Master Routine</h2><h3 id="printSubHeader" class="text-lg">Schedule</h3></div>
+        <table class="routine-print-table w-full text-sm"><thead><tr class="bg-gray-200"><th>Day / Period</th><th>1st</th><th>2nd</th><th>3rd</th><th>4th</th><th>5th</th><th>6th</th><th>7th</th><th>8th</th></tr></thead><tbody id="printBody"></tbody></table>
+    </div>
+
+    <div id="substitutionPrintArea" class="hidden">
+        <div class="print-header-container text-center mb-4"><div class="text-xl font-bold uppercase">Provisional Routine Slip</div></div>
+        <div class="print-meta mb-2 font-bold"><span id="printDate" class="mr-4 text-gray-800">Date: </span><span id="printDay" class="text-gray-800">Day: </span></div>
+        <table class="routine-print-table w-full"><thead><tr><th>PERIOD</th><th>CLASS</th><th>SUBJECT</th><th>ABSENT TEACHER</th><th>SUBSTITUTE</th></tr></thead><tbody id="substitutionPrintBody"></tbody></table>
+    </div>
+
+
+
+<!-- AUTO GENERATE MODAL -->
+    <div id="autoGenModal" class="fixed inset-0 bg-gray-900 bg-opacity-90 z-[90] hidden flex justify-center items-center p-4 no-print">
+        <div id="autoGenModalContent" class="bg-white rounded-xl shadow-2xl w-full max-w-5xl flex flex-col h-[90vh] overflow-hidden border border-indigo-200 transition-all duration-300">
+            <div class="bg-indigo-800 text-white p-4 flex justify-between items-center shrink-0">
+                <h2 class="text-lg font-black"><i class="fas fa-robot mr-2"></i> Auto Generate Routine</h2>
+                <div class="flex items-center gap-4">
+                    <button onclick="toggleMaximizeAutoGen()" id="btnMaximizeAutoGen" class="text-indigo-200 hover:text-white transition-colors focus:outline-none" title="Maximize">
+                        <i class="fas fa-expand text-lg"></i>
+                    </button>
+                    <button onclick="document.getElementById('autoGenModal').classList.add('hidden')" class="text-indigo-200 hover:text-white text-2xl transition-colors focus:outline-none">&times;</button>
+                </div>
+            </div>
+            
+            <div class="p-3 bg-indigo-50 border-b border-indigo-100 flex items-center justify-between shrink-0 flex-wrap gap-2">
+                <div class="flex flex-wrap items-center gap-3">
+                    <select id="autogen-scope" class="p-1.5 border border-indigo-300 rounded text-xs font-bold text-indigo-900 outline-none shadow-sm">
+                        <option value="DAY">Scope: Current Day Only</option>
+                        <option value="ALL">Scope: Whole Week</option>
+                    </select>
+                    <select id="autogen-mode" class="p-1.5 border border-indigo-300 rounded text-xs font-bold text-indigo-900 outline-none shadow-sm">
+                        <option value="FILL">Mode: Fill Empty Slots Only</option>
+                        <option value="OVERWRITE">Mode: Overwrite Existing Slots</option>
+                    </select>
+                    <div class="flex flex-col gap-1">
+                        <label class="flex items-center gap-2 font-bold text-indigo-900 text-[11px] cursor-pointer bg-white px-2 py-1 rounded shadow-sm border border-indigo-200 w-max">
+                            <input type="checkbox" id="autogen-avoid-repeat" class="form-checkbox h-3.5 w-3.5 text-indigo-600 rounded">
+                            Avoid Repeat Teacher (Max 1 class per teacher/day)
+                        </label>
+                        <label class="flex items-center gap-2 font-bold text-indigo-900 text-[11px] cursor-pointer bg-white px-2 py-1 rounded shadow-sm border border-indigo-200 w-max">
+                            <input type="checkbox" id="autogen-avoid-repeat-subject" class="form-checkbox h-3.5 w-3.5 text-indigo-600 rounded">
+                            Avoid Repeat Subject (Max 1 period per subject/day)
+                        </label>
+                    </div>
+                </div>
+                <button onclick="runAutoGenerate()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2 rounded shadow-md font-black text-sm transition-colors animate-pulse h-10">
+                    <i class="fas fa-cogs mr-1"></i> Generate
+                </button>
+            </div>
+
+            <div class="flex flex-col md:flex-row flex-1 overflow-hidden">
+                <!-- Left Sidebar: Class Settings -->
+                <div class="w-full md:w-1/3 border-r p-4 overflow-y-auto bg-gray-50 shrink-0">
+                    <h3 class="font-black text-gray-700 text-xs uppercase border-b-2 border-gray-300 pb-1 mb-3">Class Rules</h3>
+                    <p class="text-[10px] text-gray-500 mb-3 leading-tight">Set End Periods and allowed Subjects for each Class.</p>
+                    <div id="autoGenClassList" class="flex flex-col gap-2"></div>
+                </div>
+
+                <!-- Right Sidebar: Teacher Constraints -->
+                <div class="flex-1 p-4 overflow-y-auto bg-white">
+                    <h3 class="font-black text-gray-700 text-xs uppercase border-b-2 border-gray-300 pb-1 mb-3">Teacher Rules & Constraints</h3>
+                    <p class="text-[10px] text-gray-500 mb-3 leading-tight">Select subjects and allowed classes. Set the MAX classes per week. Uncheck "Do Not Pick" to include a teacher.</p>
+                    <div id="autoGenTeacherList" class="grid grid-cols-1 lg:grid-cols-2 gap-3"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+
+    <script src="supabase-config.js"></script>
+    <script src="app.js"></script>
+
+    <script>
+        window.activeModule = 'routine';
+
+        const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+        const PERIODS = ["1st", "2nd", "3rd", "4th", "5th", "6th", "7th", "8th"];
+        
+        let absentTeachers = new Set();
+        let draggedItem = null;
+        let selectedItem = null;
+        let activeCell = null;
+        let isSelectMode = false;
+
+        let contextTargetCell = null;
+        let contextPreviousData = null;
+        let contextSuggestedHTML = "";
+        let contextNormalHTML = "";
+
+        let undoStack = [];
+        let redoStack = [];
+        let autoSaveTimer = null;
+        
+        let excludedTeachers = new Set();
+        let exclusionTickerIndex = 0;
+        let exclusionTickerInterval = null;
+        window.appData = window.appData || {}; 
+
+        // HIGH-SPEED CONCURRENT DATA LOADING ON LOAD
+        window.addEventListener('DOMContentLoaded', async () => {
+            const todayIndex = new Date().getDay();
+            const daysMap = { 1: 'Monday', 2: 'Tuesday', 3: 'Wednesday', 4: 'Thursday', 5: 'Friday', 6: 'Saturday' };
+            const todayName = daysMap[todayIndex] || 'Monday';
+            const daySelectEl = document.getElementById('daySelect');
+            if (daySelectEl) daySelectEl.value = todayName;
+
+            const promises = [];
+            promises.push(fetchSubstitutionHistory());
+            promises.push(fetchExclusions());
+            promises.push(fetchLeaveRequests());
+
+            promises.push(fetchAutoGenSettings()); // <-- NEW:
+            await Promise.all(promises);
+
+
+
+
+
+            if (typeof fetchTeacherData === 'function') {
+                try { await fetchTeacherData(); } catch(e) {}
+            }
+
+            refreshView();
+
+            // Safety render loop
+            let safetyChecks = 0;
+            const safetyInterval = setInterval(() => {
+                if (window.appData && window.appData.routineData && window.appData.routineData.length > 0) {
+                    refreshView(); 
+                    clearInterval(safetyInterval);
+                }
+                safetyChecks++;
+                if (safetyChecks > 10) clearInterval(safetyInterval);
+            }, 500);
+
+            if (typeof initializeSubstitutionSync === 'function') {
+                await initializeSubstitutionSync();
+            }
+
+            document.getElementById('loading-overlay').classList.add('hidden');
+        });
+
+
+        // --- NEW: FETCH AUTOGEN SETTINGS FROM SUPABASE ---
+        async function fetchAutoGenSettings() {
+            try {
+                const activeSchoolId = parseInt(sessionStorage.getItem('schoolId') || localStorage.getItem('schoolId') || '1', 10);
+                const activeClient = typeof dbClient !== 'undefined' ? dbClient : (typeof supabaseClient !== 'undefined' ? supabaseClient : (typeof supabase !== 'undefined' ? supabase : null));
+
+                if (activeClient) {
+                    const { data } = await activeClient.from('exam_db')
+                        .select('id, json_payload')
+                        .eq('school_id', activeSchoolId)
+                        .eq('data_key', 'autoGenSettings').limit(1);
+
+                    if (data && data.length > 0) {
+                        let payload = data[0].json_payload;
+                        if (typeof payload === 'string') try { payload = JSON.parse(payload); } catch(e){}
+                        window.appData.autoGenSettings = payload || {};
+                    } else {
+                        window.appData.autoGenSettings = {};
+                    }
+                }
+            } catch(e) { window.appData.autoGenSettings = {}; }
+        }
+
+        async function fetchSubstitutionHistory() {
+            try {
+                const activeSchoolId = parseInt(sessionStorage.getItem('schoolId') || localStorage.getItem('schoolId') || '1', 10);
+                const activeClient = typeof dbClient !== 'undefined' ? dbClient : (typeof supabaseClient !== 'undefined' ? supabaseClient : (typeof supabase !== 'undefined' ? supabase : null));
+
+                if (activeClient) {
+                    const { data } = await activeClient.from('exam_db')
+                        .select('id, json_payload')
+                        .eq('school_id', activeSchoolId)
+                        .eq('data_key', 'substitutionHistory').limit(1);
+
+                    if (data && data.length > 0) {
+                        let payload = data[0].json_payload;
+                        if (typeof payload === 'string') try { payload = JSON.parse(payload); } catch(e){}
+                        window.appData.substitutionHistory = Array.isArray(payload) ? payload : [];
+                    } else {
+                        window.appData.substitutionHistory = [];
+                    }
+                }
+            } catch(e) { window.appData.substitutionHistory = []; }
+        }
+
+        async function fetchExclusions() {
+            try {
+                const activeSchoolId = parseInt(sessionStorage.getItem('schoolId') || localStorage.getItem('schoolId') || '1', 10);
+                const activeClient = typeof dbClient !== 'undefined' ? dbClient : (typeof supabaseClient !== 'undefined' ? supabaseClient : (typeof supabase !== 'undefined' ? supabase : null));
+
+                if (activeClient) {
+                    const { data } = await activeClient.from('exam_db')
+                        .select('id, json_payload')
+                        .eq('school_id', activeSchoolId)
+                        .eq('data_key', 'excludedTeachers').limit(1);
+
+                    if (data && data.length > 0) {
+                        let payload = data[0].json_payload;
+                        if (typeof payload === 'string') try { payload = JSON.parse(payload); } catch(e){}
+                        window.appData.excludedTeachers = Array.isArray(payload) ? payload : [];
+                    } else {
+                        window.appData.excludedTeachers = [];
+                    }
+                }
+            } catch(e) { window.appData.excludedTeachers = []; }
+            
+            excludedTeachers = new Set(window.appData.excludedTeachers);
+            updateExclusionTicker();
+        }
+
+        async function fetchLeaveRequests() {
+            try {
+                const activeSchoolId = parseInt(sessionStorage.getItem('schoolId') || localStorage.getItem('schoolId') || '1', 10);
+                const activeClient = typeof dbClient !== 'undefined' ? dbClient : (typeof supabaseClient !== 'undefined' ? supabaseClient : (typeof supabase !== 'undefined' ? supabase : null));
+
+                if (activeClient) {
+                    const { data } = await activeClient.from('exam_db')
+                        .select('id, json_payload, data_key')
+                        .eq('school_id', activeSchoolId)
+                        .in('data_key', ['leave_requests', 'leaverequest']);
+
+                    let allLeaves = [];
+                    if (data && data.length > 0) {
+                        data.forEach(row => {
+                            let payload = row.json_payload;
+                            if (typeof payload === 'string') try { payload = JSON.parse(payload); } catch(e){}
+                            if (Array.isArray(payload)) allLeaves = allLeaves.concat(payload);
+                        });
+                    }
+                    window.appData.leave_requests = allLeaves;
+                }
+            } catch(e) { window.appData.leave_requests = []; }
+            updateLeaveBadge();
+        }
+        
+        function clearHistory() { undoStack = []; redoStack = []; }
+        function refreshView() { renderSidebar(); renderGrid(); }
+
+        // --- STREAK MODAL ---
+        function showStreakModal(message, proceedCallback) {
+            document.getElementById('customStreakMessage').innerHTML = message;
+            document.getElementById('customStreakModal').classList.remove('hidden');
+            
+            window.resolveStreakWarning = function(proceed) {
+                document.getElementById('customStreakModal').classList.add('hidden');
+                if (proceed && proceedCallback) proceedCallback();
+                else { const menu = document.getElementById('subjectContextMenu'); if(menu) menu.classList.add('hidden'); }
+            };
+        }
+
+        function checkTeacherStreakWarning(teacher, day, targetPeriod, currentCell, currentProvisional = []) {
+            let dayTimes = (window.appData.routineTimes || []).filter(t => t[0] === day);
+            let tiffinConfig = dayTimes.find(t => t[1] === 'Tiffin');
+            let tiffinAfter = tiffinConfig ? tiffinConfig[2] : '4th';
+
+            let dbPeriods = (window.appData.routineData || []).filter(r => r[0] === day && r[5] === teacher).map(r => r[1]);
+            let domPeriods = [];
+            if (currentCell) {
+                document.querySelectorAll('.drop-zone').forEach(c => {
+                    if (c.dataset.teacher === teacher && c !== currentCell && c.dataset.period) domPeriods.push(c.dataset.period);
+                });
+            }
+            let provPeriods = [];
+            currentProvisional.forEach(a => { if (a.teacher === teacher) provPeriods.push(a.period); });
+
+            let existingPeriods = [...new Set([...dbPeriods, ...domPeriods, ...provPeriods, targetPeriod])];
+            let consecutiveCount = 0; let maxConsecutive = 0;
+
+            PERIODS.forEach((p, index) => {
+                if (existingPeriods.includes(p)) {
+                    if (index > 0 && PERIODS[index - 1] === tiffinAfter) consecutiveCount = 1; 
+                    else consecutiveCount++; 
+                    if (consecutiveCount > maxConsecutive) maxConsecutive = consecutiveCount;
+                } else consecutiveCount = 0; 
+            });
+            return maxConsecutive >= 3;
+        }
+
+        // --- 1. CORE RENDERING ---
+       
+
+       // --- 1. CORE RENDERING ---
+        function renderSidebar() {
+            window.appData.classes = window.appData.classes || [];
+            window.appData.teachers = window.appData.teachers || [];
+            window.appData.subjects = window.appData.subjects || [];
+            window.appData.routineData = window.appData.routineData || [];
+
+            const mode = document.getElementById('viewMode').value;
+            const list1 = document.getElementById('classList');
+            const list2 = document.getElementById('subjectList');
+            const header1 = document.getElementById('list1Header');
+            const addBtn1 = document.getElementById('list1AddBtn'); 
+
+            const sortedClasses = [...window.appData.classes].sort((a, b) => a.localeCompare(b, undefined, {numeric: true, sensitivity: 'base'}));
+            const sortedTeachers = [...window.appData.teachers].sort((a, b) => a.localeCompare(b));
+            const sortedSubjects = [...window.appData.subjects].sort((a, b) => a.localeCompare(b));
+
+            if (mode === 'teacher') {
+                header1.innerHTML = `CLASSES <span class="text-[8px] text-gray-400 normal-case font-normal ml-1 tracking-normal">(Right-click to delete)</span>`;
+                header1.className = "font-bold text-red-700 text-[10px] uppercase flex items-center";
+                if (addBtn1) addBtn1.setAttribute('onclick', "quickAdd('class')");
+                list1.innerHTML = sortedClasses.map(c => 
+                `<div class="draggable-item bg-red-50 border border-red-200 text-red-800 p-2 rounded text-center cursor-pointer active:scale-95 transition-all" 
+                        draggable="true" ondragstart="dragStart(event, 'class', '${c}')" onclick="selectItem(this, 'class', '${c}')" oncontextmenu="deletePaletteItem(event, 'class', '${c}')">${c}</div>`).join('');
+            } else {
+                header1.innerHTML = `TEACHERS <span class="text-[8px] text-gray-400 normal-case font-normal ml-1 tracking-normal">(Right-click to delete)</span>`;
+                header1.className = "font-bold text-blue-700 text-[10px] uppercase flex items-center";
+                if (addBtn1) addBtn1.setAttribute('onclick', "quickAdd('teacher')");
+                list1.innerHTML = sortedTeachers.map(t => 
+                `<div class="draggable-item bg-blue-50 border border-blue-200 text-blue-800 p-2 rounded text-center cursor-pointer active:scale-95 transition-all" 
+                        draggable="true" ondragstart="dragStart(event, 'teacher', '${t}')" onclick="selectItem(this, 'teacher', '${t}')" oncontextmenu="deletePaletteItem(event, 'teacher', '${t}')">${t}</div>`).join('');
+            }
+
+            list2.innerHTML = sortedSubjects.map(s => 
+                `<div class="draggable-item bg-green-50 border border-green-200 text-green-800 p-2 rounded text-center cursor-pointer active:scale-95 transition-all" 
+                    draggable="true" ondragstart="dragStart(event, 'subject', '${s}')" onclick="selectItem(this, 'subject', '${s}')" oncontextmenu="deletePaletteItem(event, 'subject', '${s}')">${s}</div>`).join('');
+            
+            excludedTeachers = new Set(window.appData.excludedTeachers || []);
+            updateExclusionTicker();
+            setProvisionalDateToToday();
+
+            if (window.appData.portalStatus === 'enabled') {
+                const pBtn = document.getElementById('btnPortalToggle');
+                if (pBtn) {
+                    pBtn.className = "bg-green-700 text-white hover:bg-green-800 px-3 py-1 rounded shadow font-bold text-sm flex items-center gap-2 whitespace-nowrap transition-all";
+                    pBtn.querySelector('i').className = "fas fa-toggle-on text-white";
+                    document.getElementById('portalToggleText').innerText = "Portal: Open 🔓";
+                }
+            }
+        }
+
+        function renderGrid() {
+            const mode = document.getElementById('viewMode').value;
+            const currentDay = document.getElementById('daySelect').value;
+            const showGhost = document.getElementById('ghostToggle').checked;
+
+            const tickerDay = document.getElementById('tickerDayDisplay');
+            if (tickerDay) tickerDay.innerText = currentDay;
+            const tbody = document.getElementById('gridBody');
+            tbody.innerHTML = "";
+            
+            let prevDay = DAYS[DAYS.indexOf(currentDay) - 1];
+            const rowItems = (mode === 'teacher') ? (window.appData.teachers || []) : (window.appData.classes || []);
+
+            rowItems.forEach((rowItem, index) => {
+                let totalAssigned = 0;
+                if (mode === 'teacher') totalAssigned = window.appData.routineData.filter(r => r[5] === rowItem).length;
+                else totalAssigned = window.appData.routineData.filter(r => r[2] === rowItem).length;
+
+                const rowBgClass = index % 2 === 0 ? 'bg-black' : 'bg-red-950'; 
+                const safeId = rowItem.replace(/[^a-zA-Z0-9]/g, '_');
+                
+                let tr = `<tr id="row-${safeId}" class="border-b border-gray-700 hover:brightness-125 transition-all ${rowBgClass} text-white">
+                            <td class="p-1.5 border-r border-gray-700 sticky-col align-middle ${rowBgClass}">
+                            <div class="flex items-center justify-between gap-2 min-w-[70px]"><span class="font-bold text-lg text-yellow-200 truncate" title="${rowItem}">${rowItem}</span><span class="bg-gray-200 text-black text-[20px] font-black px-2.5 py-0.5 rounded shadow-sm" title="Total Weekly Classes: ${totalAssigned}">${totalAssigned}</span></div>
+                            </td>`;
+                            
+                PERIODS.forEach(period => {
+                    let entry;
+                    if (mode === 'teacher') entry = window.appData.routineData.find(r => r[0] === currentDay && r[5] === rowItem && r[1] === period);
+                    else entry = window.appData.routineData.find(r => r[0] === currentDay && r[2] === rowItem && r[1] === period);
+                    
+                    let content = ""; let cls="", sub="", teacher="";
+
+                    if (entry) {
+                        cls = entry[2] || ""; sub = entry[4] || ""; teacher = entry[5] || "";
+                        content = (mode === 'teacher') ? renderCellContent(cls, sub) : renderCellContent(teacher, sub); 
+                    } else if (showGhost && prevDay) {
+                        let pEntry;
+                        if (mode === 'teacher') pEntry = window.appData.routineData.find(r => r[0] === prevDay && r[5] === rowItem && r[1] === period);
+                        else pEntry = window.appData.routineData.find(r => r[0] === prevDay && r[2] === rowItem && r[1] === period);
+
+                        if(pEntry && pEntry[2] && pEntry[5]) { 
+                        content = `<div class="ghost-item" onclick="acceptGhost('${rowItem}','${period}','${pEntry[2]}','${pEntry[4]}','${pEntry[5]}')">
+                            <span class="ghost-label">Previous</span><span class="tag tag-class text-red-700 bg-white border-red-200">${mode==='teacher'?pEntry[2]:pEntry[5]}</span>
+                            </div>`;
+                        }
+                    }
+                    
+                    tr += `<td class="drop-zone border-l p-1" id="${rowItem.replace(/\s/g,'_')}-${period.replace(/\s/g,'_')}" data-target="${rowItem}" data-period="${period}" data-class="${cls}" data-teacher="${teacher}" data-subject="${sub}" ondragover="allowDrop(event)" ondrop="drop(event)" onclick="handleCellTap(this)" oncontextmenu="handleRightClick(event, this)">${content}</td>`;
+                });
+                tbody.innerHTML += tr + "</tr>";
+            });
+            if(typeof checkWorkloadStreaks === 'function') checkWorkloadStreaks();
+        }
+
+        function renderCellContent(tag1, tag2) {
+            let html = '<div class="pointer-events-none">';
+            if (tag1 && tag1 !== 'undefined') html += `<span class="tag tag-class mb-1">${tag1}</span>`;
+            if (tag2 && tag2 !== 'undefined') html += `<span class="tag tag-subject">${tag2}</span>`;
+            html += '</div>';
+            return html === '<div class="pointer-events-none"></div>' ? "" : html;
+        }
+
+        // --- 2. INTERACTIONS & SAVING ---
+        function selectItem(el, type, val) {
+            if(isSelectMode) return;
+            document.querySelectorAll('.draggable-item').forEach(d => d.style.border = "1px solid #e5e7eb");
+            selectedItem = { type, val }; el.style.border = "2px solid black";
+            if(activeCell) { activeCell.classList.remove('active-cell'); activeCell = null; }
+        }
+
+        function toggleSelectMode() {
+            isSelectMode = !isSelectMode;
+            const btn = document.getElementById('btnSelectMode');
+            if(isSelectMode) {
+                btn.classList.add('select-mode-btn-active'); selectedItem = null;
+                document.querySelectorAll('.draggable-item').forEach(d => d.style.border = "1px solid #e5e7eb");
+            } else {
+                btn.classList.remove('select-mode-btn-active');
+                if(activeCell) { activeCell.classList.remove('active-cell'); activeCell = null; }
+            }
+        }
+
+        function handleCellTap(cell) {
+            if (isSelectMode) {
+                if(activeCell) activeCell.classList.remove('active-cell');
+                if(activeCell !== cell) { activeCell = cell; activeCell.classList.add('active-cell'); }
+                else activeCell = null;
+                return;
+            }
+            if (selectedItem) handleAssignment(cell);
+            else alert("Select an item from palette to assign, or enable 'Select Mode' to delete.");
+        }
+
+        function deleteSelectedCell() {
+            if (!activeCell) return alert("Enable 'Select Mode' and tap a cell first.");
+            if (!activeCell.dataset.class && !activeCell.dataset.teacher) return alert("Empty cell.");
+            if(!confirm("Delete?")) return;
+            pushState(); 
+            activeCell.innerHTML = ""; activeCell.dataset.class = ""; activeCell.dataset.subject = ""; activeCell.dataset.teacher = "";
+            activeCell.classList.remove('active-cell'); activeCell = null; triggerAutoSave(); 
+        }
+
+        function dragStart(e,t,v) { draggedItem={type:t,val:v}; }
+        function allowDrop(e){e.preventDefault(); e.currentTarget.classList.add('drag-over');}
+        function drop(e) { e.preventDefault(); e.currentTarget.classList.remove('drag-over'); handleAssignment(e.currentTarget); draggedItem = null; }
+
+        function handleAssignment(cell) {
+            const item = draggedItem || selectedItem;
+            if(!item) return;
+
+            const mode = document.getElementById('viewMode').value;
+            const day = document.getElementById('daySelect').value;
+            const period = cell.dataset.period;
+            const target = cell.dataset.target; 
+            
+            if (mode === 'teacher' && item.type === 'class') {
+                const conflict = checkCollision(item.val, period, target, day);
+                if(conflict) return alert(`Conflict: Class ${item.val} is with ${conflict}!`);
+            } else if (mode === 'class' && item.type === 'teacher') {
+                const busyClass = checkTeacherBusy(item.val, period, day);
+                if(busyClass) return alert(`Conflict: ${item.val} is already teaching ${busyClass}!`);
+            }
+
+            let teacherToCheck = null;
+            if (mode === 'teacher') teacherToCheck = target;
+            else if (item.type === 'teacher') teacherToCheck = item.val;
+            else teacherToCheck = cell.dataset.teacher;
+
+            const executeAssignment = () => {
+                pushState(); 
+                if (item.type === 'subject') cell.dataset.subject = item.val; 
+                else if (mode === 'teacher' && item.type === 'class') { cell.dataset.class = item.val; cell.dataset.teacher = target; }
+                else if (mode === 'class' && item.type === 'teacher') { cell.dataset.teacher = item.val; cell.dataset.class = target; }
+                
+                if(mode==='teacher') cell.innerHTML = renderCellContent(cell.dataset.class, cell.dataset.subject);
+                else cell.innerHTML = renderCellContent(cell.dataset.teacher, cell.dataset.subject);
+                triggerAutoSave();
+            };
+
+            if (teacherToCheck && teacherToCheck !== 'undefined') {
+                if (checkTeacherStreakWarning(teacherToCheck, day, period, cell)) {
+                    showStreakModal(`Warning: Assigning <b>${teacherToCheck}</b> to the <b>${period}</b> period will create a streak of 3+ continuous classes.`, () => { executeAssignment(); });
+                    return;
+                }
+            }
+            executeAssignment();
+        }
+
+        function checkCollision(cls, period, currentTeacher, day) {
+            const dbConflict = window.appData.routineData.find(r => r[0] === day && r[1] === period && r[2] === cls && r[5] !== currentTeacher);
+            if (dbConflict) return dbConflict[5];
+            for (let c of document.querySelectorAll('.drop-zone')) {
+                if (c.dataset.period === period && c.dataset.class === cls && c.dataset.teacher !== currentTeacher && c.dataset.teacher) return c.dataset.teacher;
+            }
+            return null;
+        }
+
+        function checkTeacherBusy(teacher, period, day) {
+            const dbMatch = window.appData.routineData.find(r => r[0]===day && r[1]===period && r[5]===teacher);
+            if (dbMatch) return dbMatch[2];
+            for (let c of document.querySelectorAll('.drop-zone')) {
+                if (c.dataset.period === period && c.dataset.teacher === teacher && c.dataset.class) return c.dataset.class;
+            }
+            return null;
+        }
+
+        function acceptGhost(row,p,c,s,t){
+            const day = document.getElementById('daySelect').value;
+            const cell = document.getElementById(`${row.replace(/\s/g,'_')}-${p.replace(/\s/g,'_')}`);
+            const executeGhost = () => {
+                pushState();
+                cell.dataset.class=c; cell.dataset.subject=s; cell.dataset.teacher=t;
+                const mode = document.getElementById('viewMode').value;
+                cell.innerHTML=renderCellContent(mode==='teacher'?c:t,s);
+                triggerAutoSave();
+            };
+            if (t && t !== 'undefined') {
+                if (checkTeacherStreakWarning(t, day, p, cell)) {
+                    showStreakModal(`Assigning <b class="text-black">${t}</b> to the <b class="text-black">${p}</b> period creates a continuous streak of 3 or more classes.`, executeGhost);
+                    return; 
+                }
+            }
+            executeGhost();
+        }
+
+        function updateLocalDataFromDOM() {
+            const currentDay = document.getElementById('daySelect').value;
+            window.appData.routineData = (window.appData.routineData || []).filter(r => r[0] !== currentDay);
+            document.querySelectorAll('.drop-zone').forEach(c => {
+                const cls = c.dataset.class; const teacher = c.dataset.teacher; const subject = c.dataset.subject;
+                if (cls && teacher && cls !== 'undefined' && teacher !== 'undefined') window.appData.routineData.push([currentDay, c.dataset.period, cls, "A", subject || '', teacher]);
+            });
+        }
+
+        function triggerAutoSave() {
+            try { updateLocalDataFromDOM(); if(typeof checkWorkloadStreaks === 'function') checkWorkloadStreaks(); } catch (e) {}
+            clearTimeout(autoSaveTimer);
+            autoSaveTimer = setTimeout(() => { if (typeof saveToStorage === 'function') saveToStorage(); }, 1000); 
+        }
+
+        function saveCurrentDay() { triggerAutoSave(); alert("Saved Successfully!"); }
+        function quickAdd(type) {
+            const v = prompt("Name:");
+            if (v && v.trim() !== '') {
+                if (!window.appData.classes) window.appData.classes = [];
+                if (!window.appData.subjects) window.appData.subjects = [];
+                if (!window.appData.teachers) window.appData.teachers = [];
+
+                if (type === 'class') window.appData.classes.push(v);
+                if (type === 'subject') window.appData.subjects.push(v);
+                if (type === 'teacher') window.appData.teachers.push(v);
+                
+                if (typeof saveToStorage === 'function') saveToStorage();
+                renderSidebar(); renderGrid();
+            }
+        }
+
+
+
+
+        function deletePaletteItem(e, type, val) {
+            e.preventDefault(); // Prevents the browser's normal right-click menu
+            
+            if(!confirm(`Are you sure you want to permanently delete the ${type} "${val}"?\n\nIt will also be removed from any assigned slots in the grid. This action saves immediately.`)) {
+                return;
+            }
+
+            pushState(); // Save to undo history just in case
+
+            if (type === 'class') {
+                window.appData.classes = window.appData.classes.filter(c => c !== val);
+                // Scrub this class from the routine grid
+                window.appData.routineData = window.appData.routineData.filter(r => r[2] !== val);
+            } 
+            else if (type === 'teacher') {
+                window.appData.teachers = window.appData.teachers.filter(t => t !== val);
+                // Scrub this teacher from the routine grid
+                window.appData.routineData = window.appData.routineData.filter(r => r[5] !== val);
+            } 
+            else if (type === 'subject') {
+                window.appData.subjects = window.appData.subjects.filter(s => s !== val);
+                // Just remove the subject text from the grid, leave the teacher/class intact
+                window.appData.routineData.forEach(r => {
+                    if (r[4] === val) r[4] = "";
+                });
+            }
+
+            // Save to database/local storage
+            if (typeof saveToStorage === 'function') saveToStorage();
+            
+            // Redraw screen
+            renderSidebar();
+            renderGrid();
+        }
+
+        // --- 3. UNDO / REDO ---
+        function getCurrentSnapshot() {
+            const snap = [];
+            document.querySelectorAll('.drop-zone').forEach(c => { snap.push({ id: c.id, c: c.dataset.class || '', s: c.dataset.subject || '', t: c.dataset.teacher || '', html: c.innerHTML }); });
+            return snap;
+        }
+        function restoreSnapshot(snap) {
+            snap.forEach(s => {
+                const cell = document.getElementById(s.id);
+                if(cell) { cell.dataset.class = s.c; cell.dataset.subject = s.s; cell.dataset.teacher = s.t; cell.innerHTML = s.html; }
+            });
+        }
+        function pushState() { undoStack.push(getCurrentSnapshot()); if(undoStack.length > 50) undoStack.shift(); redoStack = []; }
+        function undo() { if(undoStack.length === 0) return; redoStack.push(getCurrentSnapshot()); restoreSnapshot(undoStack.pop()); triggerAutoSave(); }
+        function redo() { if(redoStack.length === 0) return; undoStack.push(getCurrentSnapshot()); restoreSnapshot(redoStack.pop()); triggerAutoSave(); }
+        document.addEventListener('keydown', function(e) {
+            if (e.ctrlKey && e.key.toLowerCase() === 'z') { e.preventDefault(); undo(); }
+            if (e.ctrlKey && e.key.toLowerCase() === 'y') { e.preventDefault(); redo(); }
+        });
+
+        // --- 4. PRINTING & REPORTS ---
+        function printMasterRoutine() {
+            const currentDay = document.getElementById('daySelect').value;
+            document.getElementById('printHeader').innerHTML = `Master Routine - ${currentDay}`; document.getElementById('printSubHeader').style.display = 'none';
+            const tbody = document.getElementById('printBody'); tbody.innerHTML = "";
+            (window.appData.teachers || []).forEach(teacher => {
+                let rowHtml = `<tr><td style="text-align:left; font-weight:bold; background:#f3f4f6;">${teacher}</td>`;
+                PERIODS.forEach(period => {
+                    const entry = window.appData.routineData.find(r => r[0] === currentDay && r[5] === teacher && r[1] === period);
+                    rowHtml += `<td>${entry ? `<div style="font-weight:900; font-size:12px;">${entry[2]}</div><div style="font-size:10px; color:#555;">${entry[4]}</div>` : ''}</td>`;
+                });
+                tbody.innerHTML += rowHtml + "</tr>";
+            });
+            document.getElementById('printArea').classList.add('print-visible');
+            setTimeout(() => { window.print(); document.getElementById('printArea').classList.remove('print-visible'); }, 500);
+        }
+        function openReportModal() { document.getElementById('reportModal').classList.remove('hidden'); updateReportDropdown(); }
+        function updateReportDropdown() {
+            const type = document.getElementById('reportType').value; const targetSel = document.getElementById('reportTarget'); targetSel.innerHTML = "";
+            const list = type === 'class' ? (window.appData.classes || []) : (window.appData.teachers || []);
+            list.forEach(item => targetSel.innerHTML += `<option value="${item}">${item}</option>`);
+        }
+        function generateAndPrint() {
+            const type = document.getElementById('reportType').value; const target = document.getElementById('reportTarget').value;
+            let totalAssigned = 0;
+            if (type === 'teacher') totalAssigned = window.appData.routineData.filter(r => r[5] === target).length;
+            else totalAssigned = window.appData.routineData.filter(r => r[2] === target).length;
+
+            document.getElementById('printHeader').innerHTML = `${target}`;
+            document.getElementById('printSubHeader').innerHTML = `${type === 'class' ? "Class" : "Teacher"} Schedule<br><span style="font-size: 12px;">Total Classes: ${totalAssigned}</span>`;
+            document.getElementById('printSubHeader').style.display = 'block';
+
+            const tbody = document.getElementById('printBody'); tbody.innerHTML = "";
+            DAYS.forEach(day => {
+                let row = `<tr><td class="font-bold border p-2">${day}</td>`;
+                PERIODS.forEach(period => {
+                    const match = window.appData.routineData.find(r => r[0] === day && r[1] === period && (type === 'class' ? r[2] === target : r[5] === target));
+                    row += `<td class="text-center border p-1">${match ? (type==='class'?`<b>${match[4]}</b><br><span style="font-size:10px">${match[5]}</span>`:`<b>${match[2]}</b><br><span style="font-size:10px">${match[4]}</span>`):'-'}</td>`;
+                });
+                tbody.innerHTML += row + "</tr>";
+            });
+            document.getElementById('reportModal').classList.add('hidden'); document.getElementById('printArea').classList.add('print-visible');
+            setTimeout(() => { window.print(); document.getElementById('printArea').classList.remove('print-visible'); }, 500);
+        }
+
+        // --- 5. SUBSTITUTION LOGIC ---
+        function setProvisionalDateToToday() {
+            const datePicker = document.getElementById('provisionalDate');
+            if (datePicker) {
+                const today = new Date(); const yyyy = today.getFullYear(); const mm = String(today.getMonth() + 1).padStart(2, '0'); const dd = String(today.getDate()).padStart(2, '0');
+                datePicker.value = `${yyyy}-${mm}-${dd}`;
+                handleProvisionalDateChange(true); 
+            }
+        }
+        function handleProvisionalDateChange(isInitialLoad = false) {
+            const dateInput = document.getElementById('provisionalDate').value;
+            if (!dateInput) return;
+
+            const [year, month, day] = dateInput.split('-'); const dateObj = new Date(year, month - 1, day); 
+            const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+            const dayName = days[dateObj.getDay()];
+            
+            if (dayName === 'Sunday') alert("Note: You selected a Sunday. No routine will load.");
+            else if (!isInitialLoad) document.getElementById('provisionalDaySelect').value = dayName; 
+
+            document.querySelectorAll('.absent-checkbox').forEach(cb => cb.checked = false); absentTeachers.clear();
+
+            (window.appData.leave_requests || []).forEach(leave => {
+                if (leave.status === 'Approved' && dateInput >= (leave.startDate || leave.start) && dateInput <= (leave.endDate || leave.end)) {
+                    absentTeachers.add(leave.teacherName || leave.name);
+                }
+            });
+
+            (window.appData.substitutionHistory || []).forEach(record => {
+                const recDate = new Date(record[0]); const yyyy = recDate.getFullYear(); const mm = String(recDate.getMonth() + 1).padStart(2, '0'); const dd = String(recDate.getDate()).padStart(2, '0');
+                if (`${yyyy}-${mm}-${dd}` === dateInput) absentTeachers.add(record[5]); 
+            });
+
+            absentTeachers.forEach(name => {
+                const safeNameId = 'absent-' + name.replace(/\s+/g, '-').replace(/[^a-zA-Z0-9-]/g, '');
+                const checkbox = document.getElementById(safeNameId);
+                if (checkbox) checkbox.checked = true;
+            });
+            renderSubstitutionTable();
+        }
+        function openSubstitutionModal() {
+            document.getElementById('substitutionModal').classList.remove('hidden');
+            const container = document.getElementById('absenteeList');
+            container.innerHTML = (window.appData.teachers || []).map(t => {
+                const safeNameId = 'absent-' + t.replace(/\s+/g, '-').replace(/[^a-zA-Z0-9-]/g, '');
+                return `<label class="flex items-center gap-2 p-1 hover:bg-red-50 rounded cursor-pointer border border-transparent hover:border-red-100"><input type="checkbox" id="${safeNameId}" onchange="toggleAbsent('${t}')" ${absentTeachers.has(t) ? 'checked' : ''} class="absent-checkbox form-checkbox text-red-600"><span class="text-xs font-bold text-gray-700">${t}</span></label>`;
+            }).join('');
+            handleProvisionalDateChange(); 
+        }
+        function toggleAbsent(t) { if(absentTeachers.has(t)) absentTeachers.delete(t); else absentTeachers.add(t); renderSubstitutionTable(); }
+        function renderSubstitutionTable() {
+            const tbody = document.getElementById('substitutionTableBody'); tbody.innerHTML = "";
+            const currentDay = document.getElementById('provisionalDaySelect').value; const currentDateStr = document.getElementById('provisionalDate').value; 
+            
+            let affected = [];
+            (window.appData.routineData || []).forEach(row => { if(row[0] === currentDay && absentTeachers.has(row[5])) affected.push({ period: row[1], cls: row[2], sub: row[4], teacher: row[5] }); });
+            affected.sort((a,b) => PERIODS.indexOf(a.period) - PERIODS.indexOf(b.period));
+            
+            if(affected.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="5" class="p-6 text-center text-gray-400 font-bold italic">No classes affected for this date.</td></tr>`;
+                return;
+            }
+
+            let savedSubstitutes = {};
+            if (window.appData.substitutionHistory && currentDateStr) {
+                const selectedDateObj = new Date(currentDateStr); selectedDateObj.setHours(0,0,0,0);
+                window.appData.substitutionHistory.forEach(record => {
+                    const recDate = new Date(record[0]); recDate.setHours(0,0,0,0);
+                    if (recDate.getTime() === selectedDateObj.getTime()) savedSubstitutes[record[2] + "_" + record[5]] = record[6]; 
+                });
+            }
+            
+            affected.forEach((item, idx) => {
+                const available = getAvailableTeachers(currentDay, item.period);
+                const preSelectedSub = savedSubstitutes[item.period + "_" + item.teacher] || "";
+                let opts = `<option value="">-- Select Substitute --</option>`;
+                available.forEach(t => { opts += `<option value="${t.name}" ${(t.name === preSelectedSub) ? "selected" : ""}>${t.label}</option>`; });
+                
+                if (preSelectedSub && !available.find(t => t.name === preSelectedSub)) {
+                    if (!absentTeachers.has(preSelectedSub)) opts += `<option value="${preSelectedSub}" selected>${preSelectedSub} (Saved)</option>`;
+                }
+                
+                tbody.innerHTML += `<tr class="border-b hover:bg-gray-50 transition-colors" data-period="${item.period}"><td class="p-2 border-r font-bold text-gray-700"><label class="flex items-center gap-1 cursor-pointer"><input type="checkbox" class="auto-cb form-checkbox text-indigo-600 rounded" checked>${item.period}</label></td><td class="p-2 border-r font-black text-red-600" data-cls="${item.cls}">${item.cls}</td><td class="p-2 border-r text-gray-800 font-medium" data-sub="${item.sub}">${item.sub}</td><td class="p-2 border-r text-red-900 font-bold bg-red-50 line-through border-white" data-abs="${item.teacher}">${item.teacher}</td><td class="p-2"><select id="sub-${idx}" data-saved="${preSelectedSub}" data-prev-val="${preSelectedSub}" onchange="validateProvisionalAssignment(this, '${item.period}')" class="sub-select border border-blue-300 p-1.5 w-full rounded text-xs bg-blue-50 font-bold text-gray-800 outline-none focus:border-blue-600 shadow-inner">${opts}</select></td></tr>`;
+            });
+        }
+
+        function getAvailableTeachers(day, period) {
+            let available = new Set(window.appData.teachers || []);
+            absentTeachers.forEach(t => available.delete(t)); excludedTeachers.forEach(t => available.delete(t));
+            
+            let busyMap = {};
+            (window.appData.routineData || []).forEach(r => { if(r[0] === day && r[1] === period) busyMap[r[5]] = r[2]; });
+
+            let availableArr = Array.from(available);
+            const isSorted = document.getElementById('sortProxyCheckbox') && document.getElementById('sortProxyCheckbox').checked;
+            const history = window.appData.substitutionHistory || [];
+            const now = new Date(); const startOfWeek = new Date(now); startOfWeek.setDate(now.getDate() - now.getDay()); startOfWeek.setHours(0,0,0,0);
+
+            let stats = availableArr.map(t => {
+                let w = 0, m = 0;
+                if (isSorted) {
+                    history.forEach(record => {
+                        if (record[6] === t) {
+                            let rDate = new Date(record[0]);
+                            if (rDate.getMonth() === now.getMonth() && rDate.getFullYear() === now.getFullYear()) m++;
+                            if (rDate >= startOfWeek && rDate <= now) w++;
+                        }
+                    });
+                }
+                
+                let regularClassesToday = (window.appData.routineData || []).filter(r => r[0] === day && r[5] === t).length;
+                let modalAssignedToday = 0;
+                document.querySelectorAll('.sub-select').forEach(s => { if (s.value === t) modalAssignedToday++; });
+
+                let totalToday = regularClassesToday + modalAssignedToday;
+                let isBusy = !!busyMap[t]; let busyLabel = isBusy ? ` (⚠️ Merge w/ ${busyMap[t]})` : "";
+
+                return { name: t, w: w, m: m, todayLoad: totalToday, isBusy: isBusy, label: isSorted ? `${t} (Today: ${totalToday} | Subs: W${w}/M${m})${busyLabel}` : `${t}${busyLabel}` };
+            });
+            
+            stats.sort((a, b) => { 
+                if (a.isBusy !== b.isBusy) return a.isBusy ? 1 : -1;
+                if (isSorted) {
+                    if (a.todayLoad !== b.todayLoad) return a.todayLoad - b.todayLoad;
+                    if (a.w !== b.w) return a.w - b.w; return a.m - b.m; 
+                } else return a.name.localeCompare(b.name);
+            });
+            return stats; 
+        }
+
+        function validateProvisionalAssignment(selectElement, targetPeriod) {
+            const teacher = selectElement.value; if (!teacher) return; 
+            const currentDay = document.getElementById('provisionalDaySelect').value;
+            let currentProvisional = [];
+            document.querySelectorAll('.sub-select').forEach(s => { if (s.value && s !== selectElement) currentProvisional.push({ teacher: s.value, period: s.closest('tr').dataset.period }); });
+
+            if (checkTeacherStreakWarning(teacher, currentDay, targetPeriod, null, currentProvisional)) {
+                const previousValue = selectElement.getAttribute('data-prev-val') || "";
+                showStreakModal(`Assigning <b class="text-black">${teacher}</b> to the <b class="text-black">${targetPeriod}</b> period creates a continuous streak of 3 or more classes.`, () => { selectElement.setAttribute('data-prev-val', teacher); });
+                const originalResolver = window.resolveStreakWarning;
+                window.resolveStreakWarning = function(proceed) {
+                    document.getElementById('customStreakModal').classList.add('hidden');
+                    if (proceed) selectElement.setAttribute('data-prev-val', teacher); else selectElement.value = previousValue; 
+                    window.resolveStreakWarning = originalResolver;
+                };
+            } else selectElement.setAttribute('data-prev-val', teacher);
+        }
+
+        function autoAssignSubstitutes() {
+            const currentDay = document.getElementById('provisionalDaySelect').value; const allDropdowns = Array.from(document.querySelectorAll('.sub-select')); const scopeVal = document.getElementById('autoAssignScope').value;
+            
+            let allowedPeriods = [];
+            if (scopeVal === 'ALL') allowedPeriods = [...PERIODS];
+            else if (scopeVal === 'TIFFIN') {
+                let dayTimes = (window.appData.routineTimes || []).filter(t => t[0] === currentDay); let tiffinConfig = dayTimes.find(t => t[1] === 'Tiffin'); let tiffinAfter = tiffinConfig ? tiffinConfig[2] : '4th';
+                const limitIndex = PERIODS.indexOf(tiffinAfter) + 1; allowedPeriods = PERIODS.slice(0, limitIndex);
+            } else { const limitIndex = parseInt(scopeVal); allowedPeriods = PERIODS.slice(0, limitIndex); }
+
+            let teacherScheduleMap = {}; 
+            (window.appData.teachers || []).forEach(t => { teacherScheduleMap[t] = (window.appData.routineData || []).filter(r => r[0] === currentDay && r[5] === t).map(r => r[1]); });
+            let dayTimes = (window.appData.routineTimes || []).filter(t => t[0] === currentDay); let tiffinConfig = dayTimes.find(t => t[1] === 'Tiffin'); let tiffinAfter = tiffinConfig ? tiffinConfig[2] : '4th';
+
+            for (let selectEl of allDropdowns) {
+                const row = selectEl.closest('tr'); const period = row.dataset.period;
+                if (!allowedPeriods.includes(period)) continue; if (selectEl.value !== "") continue; if (row.querySelector('.auto-cb') && !row.querySelector('.auto-cb').checked) continue;
+                
+                const availableTeachers = getAvailableTeachers(currentDay, period);
+                for (let tObj of availableTeachers) {
+                    if (tObj.isBusy) continue; 
+                    const candidate = tObj.name; let periods = [...(teacherScheduleMap[candidate] || []), period]; let consecutive = 0; let sortedPeriods = periods.sort((a,b) => PERIODS.indexOf(a) - PERIODS.indexOf(b)); let isStreak = false;
+                    for(let i=0; i<sortedPeriods.length; i++) {
+                        let p = sortedPeriods[i]; let pIndex = PERIODS.indexOf(p);
+                        if (i > 0 && PERIODS.indexOf(sortedPeriods[i-1]) !== pIndex - 1) consecutive = 0;
+                        if (i > 0 && sortedPeriods[i-1] === tiffinAfter) consecutive = 1; else consecutive++;
+                        if (consecutive >= 3) { isStreak = true; break; }
+                    }
+                    if (!isStreak) { selectEl.value = candidate; teacherScheduleMap[candidate].push(period); break; }
+                }
+            }
+        }
+
+        async function saveAndPrintSubstitution() {
+            const printBody = document.getElementById('substitutionPrintBody'); printBody.innerHTML = "";
+            const rawDateStr = document.getElementById('provisionalDate').value; const currentDay = document.getElementById('provisionalDaySelect').value;
+            if (!rawDateStr) return alert("Please select a valid date.");
+
+            const [year, month, day] = rawDateStr.split('-'); const dateObj = new Date(year, month - 1, day); const monthStr = dateObj.toLocaleString('default', { month: 'long' });
+            document.getElementById('printDate').innerText = "Date: " + dateObj.toLocaleDateString('en-US'); document.getElementById('printDay').innerText = "Day: " + currentDay;
+            
+            let hasData = false; let newlyAssignedRows = [];
+            document.querySelectorAll('#substitutionTableBody tr').forEach(row => {
+                const cells = row.querySelectorAll('td'); if(cells.length < 5) return;
+                const selectEl = row.querySelector('select'); const substitute = selectEl.value; const period = cells[0].innerText.trim();
+                const cls = row.querySelector('[data-cls]').getAttribute('data-cls'); const subject = row.querySelector('[data-sub]').getAttribute('data-sub'); const absentTeacher = row.querySelector('[data-abs]').getAttribute('data-abs');
+                
+                if (substitute) {
+                    let mergedWith = "";
+                    (window.appData.routineData || []).forEach(r => { if (r[0] === currentDay && r[1] === period && r[5] === substitute) mergedWith = r[2]; });
+                    let printCls = cls; let dbCls = cls;
+                    if (mergedWith) {
+                        printCls = `<span style="font-weight:900;">${cls}</span><br><span style="font-size:10px; color:#c2410c; border:1px solid #fed7aa; background-color:#fff7ed; padding:1px 4px; border-radius:3px; display:inline-block; margin-top:2px;">+ Merged: ${mergedWith}</span>`;
+                        dbCls = `${cls} (Merged: ${mergedWith})`;
+                    }
+                    hasData = true;
+                    printBody.innerHTML += `<tr><td style="padding: 6px;">${period}</td><td style="padding: 6px;">${printCls}</td><td style="padding: 6px;">${subject}</td><td style="padding: 6px;">${absentTeacher}</td><td style="font-weight:bold; font-size: 14pt; padding: 6px;">${substitute}</td></tr>`;
+                    newlyAssignedRows.push([rawDateStr, monthStr, period, dbCls, subject, absentTeacher, substitute]);
+                }
+            });
+            
+            if(!hasData) return alert("Please assign at least one substitute.");
+            window.appData.substitutionHistory = window.appData.substitutionHistory || [];
+            window.appData.substitutionHistory = window.appData.substitutionHistory.filter(record => record[0] !== rawDateStr);
+            window.appData.substitutionHistory.push(...newlyAssignedRows);
+            
+            try {
+                const activeClient = typeof dbClient !== 'undefined' ? dbClient : (typeof supabaseClient !== 'undefined' ? supabaseClient : (typeof supabase !== 'undefined' ? supabase : null));
+                if (activeClient) {
+                    const activeSchoolId = parseInt(sessionStorage.getItem('schoolId') || localStorage.getItem('schoolId') || '1', 10);
+                    const payloadStr = JSON.stringify(window.appData.substitutionHistory);
+                    const { data: existing } = await activeClient.from('exam_db').select('id').eq('school_id', activeSchoolId).eq('data_key', 'substitutionHistory').limit(1);
+                    if (existing && existing.length > 0) await activeClient.from('exam_db').update({ json_payload: payloadStr }).eq('id', existing[0].id);
+                    else await activeClient.from('exam_db').insert({ school_id: activeSchoolId, data_key: 'substitutionHistory', json_payload: payloadStr });
+                } else if (typeof saveToStorage === 'function') saveToStorage(); 
+            } catch (err) { console.error("Error saving to supabase", err); }
+            
+            document.getElementById('substitutionModal').classList.add('hidden'); document.getElementById('substitutionPrintArea').classList.add('print-visible');
+            setTimeout(() => { window.print(); document.getElementById('substitutionPrintArea').classList.remove('print-visible'); }, 500);
+        }
+
+        function toggleAllAutoCb(masterCheckbox) { document.querySelectorAll('.auto-cb').forEach(cb => { cb.checked = masterCheckbox.checked; }); }
+        function resetProvisionalAssignments() { if (!confirm("Are you sure you want to clear all assigned substitutes?")) return; document.querySelectorAll('.sub-select').forEach(selectEl => { selectEl.value = ""; }); }
+
+        // --- NEW: EXTRA CLASS REGISTER LOGIC ---
+        function openExtraClassModal() {
+            document.getElementById('extraClassModal').classList.remove('hidden');
+        }
+
+        function generateExtraClassReport() {
+            const start = document.getElementById('extraClassStart').value;
+            const end = document.getElementById('extraClassEnd').value;
+            const tbody = document.getElementById('extraClassBody');
+
+            if (!start || !end) {
+                alert("Please select both a Start Date and an End Date.");
+                return;
+            }
+            if (start > end) {
+                alert("Start Date cannot be after End Date.");
+                return;
+            }
+
+            const history = window.appData.substitutionHistory || [];
+            let teacherCounts = {};
+
+            // Ensure all known teachers are in the map at 0
+            (window.appData.teachers || []).forEach(t => teacherCounts[t] = 0);
+
+            // Tally valid records
+            history.forEach(row => {
+                const recDate = row[0]; // stored as YYYY-MM-DD
+                if (recDate >= start && recDate <= end) {
+                    const substitute = row[6];
+                    if (substitute) {
+                        teacherCounts[substitute] = (teacherCounts[substitute] || 0) + 1;
+                    }
+                }
+            });
+
+            // Convert to array and sort
+            let sortedCounts = [];
+            for (const [name, count] of Object.entries(teacherCounts)) {
+                if (count > 0 || window.appData.teachers.includes(name)) { // show teachers with 0 if they are staff
+                    sortedCounts.push({ name, count });
+                }
+            }
+            sortedCounts.sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+
+            tbody.innerHTML = "";
+            if (sortedCounts.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="2" class="p-6 text-center text-gray-400 italic font-bold">No substitution data found for this date range.</td></tr>`;
+                return;
+            }
+
+            sortedCounts.forEach(item => {
+                const rowColor = item.count > 0 ? "text-gray-800" : "text-gray-400";
+                const badgeColor = item.count > 0 ? "bg-red-100 text-red-800 border-red-200" : "bg-gray-100 text-gray-500 border-gray-200";
+                tbody.innerHTML += `
+                    <tr class="border-b hover:bg-red-50">
+                        <td class="p-3 font-bold ${rowColor}">${item.name}</td>
+                        <td class="p-3 text-center">
+                            <span class="inline-block px-3 py-1 font-black text-sm rounded border shadow-sm ${badgeColor}">
+                                ${item.count}
+                            </span>
+                        </td>
+                    </tr>
+                `;
+            });
+        }
+
+        // --- 6. LEAVE MANAGEMENT HUB (WITH REGISTER TAB) ---
+        function updateLeaveBadge() {
+            const pendingLeaves = (window.appData.leave_requests || []).filter(l => l.status === 'Pending');
+            const badge = document.getElementById('leaveBadge');
+            if (pendingLeaves.length === 0) badge.classList.add('hidden');
+            else { badge.innerText = pendingLeaves.length; badge.classList.remove('hidden'); }
+        }
+
+        function openLeaveApprovalModal() {
+            document.getElementById('leaveApprovalModal').classList.remove('hidden');
+            switchLeaveTab('pending');
+        }
+
+        function closeLeaveApprovalModal() { document.getElementById('leaveApprovalModal').classList.add('hidden'); }
+
+        function switchLeaveTab(tabName) {
+            // Reset all tabs
+            ['pending', 'history', 'register'].forEach(t => {
+                document.getElementById('tab-leave-' + t).className = "tab-btn tab-inactive flex-1 py-3 px-2 text-xs uppercase text-center hover:bg-gray-50";
+                document.getElementById('view-leave-' + t).classList.add('hidden');
+            });
+
+            // Activate chosen tab
+            document.getElementById('tab-leave-' + tabName).className = "tab-btn tab-active flex-1 py-3 px-2 text-xs uppercase text-center";
+            document.getElementById('view-leave-' + tabName).classList.remove('hidden');
+
+            if (tabName === 'pending' || tabName === 'history') {
+                renderLeaveApprovalTable();
+            }
+        }
+
+        function renderLeaveApprovalTable() {
+            const tbodyPending = document.getElementById('leaveApprovalBody');
+            const tbodyHistory = document.getElementById('leaveHistoryBody');
+            tbodyPending.innerHTML = ""; tbodyHistory.innerHTML = "";
+
+            const leaves = window.appData.leave_requests || [];
+            const pending = leaves.filter(l => l.status === 'Pending');
+            const history = leaves.filter(l => l.status !== 'Pending');
+
+            if (pending.length === 0) {
+                tbodyPending.innerHTML = `<tr><td colspan="4" class="p-6 text-center text-gray-400 font-bold italic">No pending leave applications.</td></tr>`;
+            } else {
+                pending.forEach((leave) => {
+                    const name = leave.teacherName || leave.name || 'Unknown';
+                    const start = leave.startDate || leave.start || 'N/A';
+                    const end = leave.endDate || leave.end || 'N/A';
+                    tbodyPending.innerHTML += `
+                    <tr class="border-b hover:bg-teal-50">
+                        <td class="p-2 font-black text-gray-800">${name}</td>
+                        <td class="p-2 font-bold text-teal-800">${leave.leaveType || 'Leave'}<br><span class="text-[10px] text-gray-500">${leave.reason || ''}</span></td>
+                        <td class="p-2 text-gray-700 font-bold"><span class="bg-gray-200 px-1 rounded">${start}</span> to <span class="bg-gray-200 px-1 rounded">${end}</span></td>
+                        <td class="p-2 flex gap-1 justify-center">
+                            <button onclick="processLeave('${leave.submittedAt}', 'Approved', this)" class="bg-green-600 text-white px-2 py-1 rounded text-[10px] font-bold shadow">Approve</button>
+                            <button onclick="processLeave('${leave.submittedAt}', 'Rejected', this)" class="bg-red-600 text-white px-2 py-1 rounded text-[10px] font-bold shadow">Reject</button>
+                        </td>
+                    </tr>`;
+                });
+            }
+
+            if (history.length === 0) {
+                tbodyHistory.innerHTML = `<tr><td colspan="4" class="p-6 text-center text-gray-400 font-bold italic">No history records found.</td></tr>`;
+            } else {
+                history.sort((a,b) => new Date(b.submittedAt) - new Date(a.submittedAt)).forEach((leave) => {
+                    const name = leave.teacherName || leave.name || 'Unknown';
+                    const start = leave.startDate || leave.start || 'N/A';
+                    const end = leave.endDate || leave.end || 'N/A';
+                    const statusClass = leave.status === 'Approved' ? 'text-green-600' : 'text-red-600';
+                    tbodyHistory.innerHTML += `
+                    <tr class="border-b hover:bg-gray-100">
+                        <td class="p-2 font-black text-gray-800">${name}</td>
+                        <td class="p-2 font-bold text-gray-600">${leave.leaveType || 'Leave'}<br><span class="text-[10px]">${leave.reason || ''}</span></td>
+                        <td class="p-2 text-gray-700 font-bold"><span class="bg-gray-200 px-1 rounded">${start}</span> to <span class="bg-gray-200 px-1 rounded">${end}</span></td>
+                        <td class="p-2 text-center font-black ${statusClass}">${leave.status}</td>
+                    </tr>`;
+                });
+            }
+        }
+
+        async function processLeave(submitId, status, btnElement) {
+            btnElement.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+            const leaveIndex = window.appData.leave_requests.findIndex(l => l.submittedAt === submitId);
+            
+            if(leaveIndex > -1) {
+                const leaveItem = window.appData.leave_requests[leaveIndex];
+                
+                if (status === 'Rejected') {
+                    window.appData.leave_requests.splice(leaveIndex, 1);
+                } else {
+                    window.appData.leave_requests[leaveIndex].status = 'Approved';
+                    const dateInput = document.getElementById('provisionalDate');
+                    if (dateInput && dateInput.value) {
+                        const start = leaveItem.startDate || leaveItem.start;
+                        const end = leaveItem.endDate || leaveItem.end;
+                        if (dateInput.value >= start && dateInput.value <= end) {
+                            absentTeachers.add(leaveItem.teacherName || leaveItem.name);
+                            if (!document.getElementById('substitutionModal').classList.contains('hidden')) {
+                                renderSubstitutionTable();
+                            }
+                        }
+                    }
+                }
+
+                try {
+                    const activeSchoolId = parseInt(sessionStorage.getItem('schoolId') || localStorage.getItem('schoolId') || '1', 10);
+                    const activeClient = typeof dbClient !== 'undefined' ? dbClient : (typeof supabaseClient !== 'undefined' ? supabaseClient : (typeof supabase !== 'undefined' ? supabase : null));
+
+                    if (activeClient) {
+                        const payloadStr = JSON.stringify(window.appData.leave_requests);
+                        const { data: existing } = await activeClient.from('exam_db')
+                            .select('id').eq('school_id', activeSchoolId).eq('data_key', 'leave_requests').limit(1);
+                        
+                        if (existing && existing.length > 0) {
+                            await activeClient.from('exam_db').update({ json_payload: payloadStr }).eq('id', existing[0].id);
+                        } else {
+                            await activeClient.from('exam_db').insert({ school_id: activeSchoolId, data_key: 'leave_requests', json_payload: payloadStr });
+                        }
+                    }
+                } catch(e) { console.error("Error updating leaves in Supabase", e); }
+
+                updateLeaveBadge();
+                renderLeaveApprovalTable();
+            }
+        }
+
+        // --- NEW: LEAVE REGISTER GENERATOR ---
+        function generateLeaveRegister() {
+            const start = document.getElementById('leaveRegStart').value;
+            const end = document.getElementById('leaveRegEnd').value;
+            const tbody = document.getElementById('leaveRegisterBody');
+
+            if (!start || !end) {
+                alert("Please select both a Start Date and an End Date.");
+                return;
+            }
+            if (start > end) {
+                alert("Start Date cannot be after End Date.");
+                return;
+            }
+
+            const leaves = window.appData.leave_requests || [];
+            let teacherData = {};
+            (window.appData.teachers || []).forEach(t => teacherData[t] = { count: 0, details: [] });
+
+            // Helper to count days between two dates
+            const getDaysBetween = (d1, d2) => {
+                const date1 = new Date(d1); const date2 = new Date(d2);
+                const diffTime = Math.abs(date2 - date1);
+                return Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1; 
+            };
+
+            leaves.forEach(leave => {
+                if (leave.status === 'Approved') {
+                    const lStart = leave.startDate || leave.start;
+                    const lEnd = leave.endDate || leave.end;
+                    const name = leave.teacherName || leave.name;
+                    
+                    // Check if the leave period falls inside or overlaps the requested date range
+                    if ((lStart >= start && lStart <= end) || (lEnd >= start && lEnd <= end) || (lStart <= start && lEnd >= end)) {
+                        
+                        // Calculate overlapping days
+                        const overlapStart = lStart > start ? lStart : start;
+                        const overlapEnd = lEnd < end ? lEnd : end;
+                        const days = getDaysBetween(overlapStart, overlapEnd);
+
+                        if (!teacherData[name]) teacherData[name] = { count: 0, details: [] };
+                        teacherData[name].count += days;
+                        teacherData[name].details.push(`<span class="font-bold text-teal-800">${overlapStart} to ${overlapEnd}</span> (${leave.leaveType || 'Leave'} - <i>${leave.reason || 'No reason'}</i>)`);
+                    }
+                }
+            });
+
+            // Convert to array and sort
+            let sortedTeachers = [];
+            for (const [name, data] of Object.entries(teacherData)) {
+                if (data.count > 0 || window.appData.teachers.includes(name)) {
+                    sortedTeachers.push({ name, ...data });
+                }
+            }
+            sortedTeachers.sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+
+            tbody.innerHTML = "";
+            if (sortedTeachers.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="3" class="p-6 text-center text-gray-400 italic font-bold">No approved leaves found for this date range.</td></tr>`;
+                return;
+            }
+
+            sortedTeachers.forEach(item => {
+                const rowColor = item.count > 0 ? "text-gray-800" : "text-gray-400";
+                const badgeColor = item.count > 0 ? "bg-teal-100 text-teal-800 border-teal-200" : "bg-gray-100 text-gray-500 border-gray-200";
+                const detailsHtml = item.details.length > 0 ? item.details.join('<br>') : '<span class="text-gray-300 italic">None</span>';
+                
+                tbody.innerHTML += `
+                    <tr class="border-b hover:bg-teal-50">
+                        <td class="p-3 font-bold ${rowColor}">${item.name}</td>
+                        <td class="p-3 text-center">
+                            <span class="inline-block px-3 py-1 font-black text-sm rounded border shadow-sm ${badgeColor}">
+                                ${item.count}
+                            </span>
+                        </td>
+                        <td class="p-3 text-[11px] leading-relaxed text-gray-600">${detailsHtml}</td>
+                    </tr>
+                `;
+            });
+        }
+
+        // --- 7. EXCLUSION SYNC ---
+        async function saveExclusionsToSupabase() {
+            try {
+                window.appData.excludedTeachers = Array.from(excludedTeachers);
+                const activeSchoolId = parseInt(sessionStorage.getItem('schoolId') || localStorage.getItem('schoolId') || '1', 10);
+                const activeClient = typeof dbClient !== 'undefined' ? dbClient : (typeof supabaseClient !== 'undefined' ? supabaseClient : (typeof supabase !== 'undefined' ? supabase : null));
+                
+                if (activeClient) {
+                    const payloadStr = JSON.stringify(window.appData.excludedTeachers);
+
+                    const { data: existing } = await activeClient.from('exam_db')
+                        .select('id')
+                        .eq('school_id', activeSchoolId)
+                        .eq('data_key', 'excludedTeachers').limit(1);
+
+                    if (existing && existing.length > 0) {
+                        await activeClient.from('exam_db').update({ json_payload: payloadStr }).eq('id', existing[0].id);
+                    } else {
+                        await activeClient.from('exam_db').insert({ school_id: activeSchoolId, data_key: 'excludedTeachers', json_payload: payloadStr });
+                    }
+                }
+            } catch (err) { console.error("Error saving exclusions:", err); }
+        }
+
+        function updateExclusionTicker() {
+            const container = document.getElementById('exclusionTickerContainer');
+            const textEl = document.getElementById('exclusionTickerText');
+            if (!container || !textEl) return;
+            
+            clearInterval(exclusionTickerInterval);
+            if (excludedTeachers.size === 0) {
+                container.classList.remove('flex'); container.classList.add('hidden');
+                return;
+            }
+            container.classList.remove('hidden'); container.classList.add('flex');
+            
+            const excludedArray = Array.from(excludedTeachers);
+            const tickName = () => {
+                if(excludedArray.length === 0) return;
+                exclusionTickerIndex = (exclusionTickerIndex + 1) % excludedArray.length;
+                textEl.innerHTML = `<i class="fas fa-ban"></i> <span>Omitted: <b>${excludedArray[exclusionTickerIndex]}</b></span>`;
+            };
+            tickName(); 
+            exclusionTickerInterval = setInterval(tickName, 3000); 
+        }
+
+        function openExclusionModal() {
+            document.getElementById('exclusionModal').classList.remove('hidden');
+            const container = document.getElementById('exclusionListContainer');
+            container.innerHTML = [...(window.appData.teachers || [])].sort().map(t => `
+                <label class="flex items-center justify-between p-3 hover:bg-red-50 cursor-pointer border-b border-gray-100 transition-colors">
+                    <span class="text-xs font-bold text-gray-700">${t}</span>
+                    <input type="checkbox" onchange="toggleExclusion('${t}')" ${excludedTeachers.has(t) ? 'checked' : ''} class="form-checkbox text-red-600 w-4 h-4 rounded">
+                </label>
+            `).join('');
+        }
+
+        function toggleExclusion(t) {
+            if (excludedTeachers.has(t)) excludedTeachers.delete(t);
+            else excludedTeachers.add(t);
+            updateExclusionTicker();
+            saveExclusionsToSupabase();
+            renderSubstitutionTable();
+        }
+
+        function closeExclusionModal() { 
+            document.getElementById('exclusionModal').classList.add('hidden'); 
+            saveExclusionsToSupabase();
+            renderSubstitutionTable(); 
+        }
+
+        // --- 8. TIMINGS ---
+        function openTimeScheduleModal() {
+            document.getElementById('timeScheduleModal').classList.remove('hidden');
+            document.getElementById('modalDaySelect').value = document.getElementById('daySelect').value;
+            loadDayTimingsIntoModal();
+        }
+
+        function closeTimeScheduleModal() { document.getElementById('timeScheduleModal').classList.add('hidden'); }
+
+        function loadDayTimingsIntoModal() {
+            const day = document.getElementById('modalDaySelect').value;
+            const container = document.getElementById('modalTimeRowsContainer');
+            const tiffinSelect = document.getElementById('tiffinPeriodSelect');
+            container.innerHTML = "";
+            
+            const dayTimes = (window.appData.routineTimes || []).filter(t => t[0] === day);
+            const tiffinConfig = dayTimes.find(t => t[1] === 'Tiffin');
+            if (tiffinConfig && tiffinSelect) tiffinSelect.value = tiffinConfig[2];
+            else if (tiffinSelect) tiffinSelect.value = '4th'; 
+
+            PERIODS.forEach(period => {
+                const match = dayTimes.find(t => t[1] === period);
+                const startTime = match ? match[2] : "";
+                const endTime = match ? match[3] : "";
+                container.innerHTML += `
+                <div class="flex items-center gap-2 border-b pb-1.5 border-gray-100 last:border-b-0">
+                    <span class="w-10 font-bold text-xs text-gray-500 text-center">${period}</span>
+                    <div class="flex-1 flex gap-1 items-center">
+                    <input type="text" id="start-${period}" value="${startTime}" placeholder="e.g., 10:40 AM" class="w-full text-xs p-1.5 border border-gray-300 rounded outline-none">
+                    <span class="text-gray-400 text-xs italic">to</span>
+                    <input type="text" id="end-${period}" value="${endTime}" placeholder="e.g., 11:20 AM" class="w-full text-xs p-1.5 border border-gray-300 rounded outline-none">
+                    </div>
+                </div>`;
+            });
+        }
+
+        function saveModalTimings() {
+            const day = document.getElementById('modalDaySelect').value;
+            const tiffinVal = document.getElementById('tiffinPeriodSelect').value;
+            const updatedEntries = [];
+            
+            updatedEntries.push([day, 'Tiffin', tiffinVal, '']);
+
+            PERIODS.forEach(period => {
+                const start = document.getElementById(`start-${period}`).value.trim();
+                const end = document.getElementById(`end-${period}`).value.trim();
+                if (start || end) updatedEntries.push([day, period, start, end]);
+            });
+
+            window.appData.routineTimes = (window.appData.routineTimes || []).filter(row => row[0] !== day);
+            window.appData.routineTimes = window.appData.routineTimes.concat(updatedEntries);
+            
+            if (typeof saveToStorage === 'function') saveToStorage();
+            if (typeof checkWorkloadStreaks === 'function') checkWorkloadStreaks(); 
+            
+            alert(`Timings & Tiffin for ${day} updated successfully!`);
+            closeTimeScheduleModal();
+        }
+
+        // --- MISC ---
+        function toggleTeacherPortal() {
+            const textStr = document.getElementById('portalToggleText');
+            let isCurrentEnabled = window.appData.portalStatus === 'enabled';
+            window.appData.portalStatus = isCurrentEnabled ? 'disabled' : 'enabled';
+            if (typeof saveToStorage === 'function') saveToStorage();
+            
+            const btn = document.getElementById('btnPortalToggle');
+            const icon = btn.querySelector('i');
+            if (window.appData.portalStatus === 'enabled') {
+                btn.className = "bg-green-700 text-white hover:bg-green-800 px-3 py-1 rounded shadow font-bold text-sm flex items-center gap-2 whitespace-nowrap transition-all";
+                icon.className = "fas fa-toggle-on text-white";
+                textStr.innerText = "Portal: Open 🔓";
+            } else {
+                btn.className = "bg-gray-800 text-white hover:bg-black px-3 py-1 rounded shadow font-bold text-sm flex items-center gap-2 whitespace-nowrap transition-all";
+                icon.className = "fas fa-toggle-off text-red-400";
+                textStr.innerText = "Portal: Locked 🔒";
+            }
+        }
+
+        function toggleTopBar() {
+            const topBar = document.getElementById('mainTopBar');
+            const btnIcon = document.querySelector('#topBarToggleBtn i');
+            if (topBar.classList.contains('hidden')) {
+                topBar.classList.remove('hidden'); topBar.classList.add('flex');
+                btnIcon.classList.replace('fa-chevron-down', 'fa-chevron-up');
+            } else {
+                topBar.classList.add('hidden'); topBar.classList.remove('flex');
+                btnIcon.classList.replace('fa-chevron-up', 'fa-chevron-down');
+            }
+        }
+        
+        function handleRightClick(event, cell) {
+            event.preventDefault(); 
+            if (isSelectMode) return; 
+
+            if (typeof updateLocalDataFromDOM === 'function') updateLocalDataFromDOM();
+
+            window.appData = window.appData || { routineData: [], subjects: [], classes: [], teachers: [] };
+            
+            contextTargetCell = cell;
+            const menu = document.getElementById('subjectContextMenu');
+            if (!menu) return;
+
+            const mode = document.getElementById('viewMode').value;
+            const listPrimary = document.getElementById('contextMenuListPrimary');
+            const listSubject = document.getElementById('contextMenuListSubject');
+            const headerPrimary = document.getElementById('contextMenuTitlePrimary');
+            const headerPrimaryBg = document.getElementById('contextMenuHeaderPrimary');
+
+            const currentDay = document.getElementById('daySelect').value;
+            const period = cell.dataset.period;
+            const target = cell.dataset.target; 
+            
+            let prevDay = DAYS[DAYS.indexOf(currentDay) - 1];
+            let pEntry = null;
+
+            if (prevDay && window.appData.routineData) {
+                if (mode === 'teacher') pEntry = window.appData.routineData.find(r => r[0] === prevDay && r[5] === target && r[1] === period);
+                else pEntry = window.appData.routineData.find(r => r[0] === prevDay && r[2] === target && r[1] === period);
+            }
+
+            const quickActions = document.getElementById('contextMenuQuickActions');
+            const prevLabel = document.getElementById('sameAsPrevLabel');
+            const prevCheckbox = document.getElementById('sameAsPrevCheckbox');
+            const prevText = document.getElementById('prevDetailsText');
+
+            if (pEntry) {
+                contextPreviousData = { c: pEntry[2], s: pEntry[4], t: pEntry[5] };
+                prevLabel.classList.remove('hidden'); prevLabel.classList.add('flex');
+                prevCheckbox.checked = false; 
+                prevText.innerText = mode === 'teacher' ? `${pEntry[2]} (${pEntry[4]})` : `${pEntry[5]} (${pEntry[4]})`;
+                quickActions.classList.remove('hidden'); quickActions.classList.add('flex');
+            } else {
+                contextPreviousData = null;
+                prevLabel.classList.add('hidden');
+            }
+
+            const busyClasses = (window.appData.routineData || [])
+                .filter(r => r[0] === currentDay && r[1] === period && r[5] !== target).map(r => r[2]);
+            const busyTeachers = (window.appData.routineData || [])
+                .filter(r => r[0] === currentDay && r[1] === period && r[2] !== target).map(r => r[5]);
+
+            const availableClasses = [...(window.appData.classes || [])]
+                .filter(c => !busyClasses.includes(c)).sort((a, b) => a.localeCompare(b, undefined, {numeric: true}));
+            const availableTeachers = [...(window.appData.teachers || [])]
+                .filter(t => !busyTeachers.includes(t)).sort((a, b) => a.localeCompare(b));
+            const sortedSubjects = [...(window.appData.subjects || [])].sort((a, b) => a.localeCompare(b));
+
+            let primaryData, primaryType;
+            if (mode === 'teacher') {
+                primaryData = availableClasses; 
+                primaryType = 'class';
+                headerPrimary.innerText = 'Assign Class';
+                headerPrimaryBg.className = "px-3 py-2 bg-red-50 text-[10px] font-black text-red-800 uppercase border-b border-red-100 shadow-sm flex items-center justify-between";
+            } else {
+                primaryData = availableTeachers; 
+                primaryType = 'teacher';
+                headerPrimary.innerText = 'Assign Teacher';
+                headerPrimaryBg.className = "px-3 py-2 bg-blue-50 text-[10px] font-black text-blue-800 uppercase border-b border-blue-100 shadow-sm flex items-center justify-between";
+            }
+
+            contextNormalHTML = primaryData.map(item => 
+                `<div class="menu-item px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-200 cursor-pointer font-bold border-b border-gray-100" onclick="assignFromMenu('${primaryType}', '${item}')">${item}</div>`
+            ).join('') + `<div class="px-3 py-2 text-xs text-red-600 hover:bg-red-50 cursor-pointer font-bold border-t border-gray-200" onclick="assignFromMenu('${primaryType}', '')">Clear</div>`;
+            
+            let subjectHTML = sortedSubjects.map(s => 
+                `<div class="menu-item px-3 py-1.5 text-xs text-gray-700 hover:bg-green-100 cursor-pointer font-bold border-b border-green-50" onclick="assignFromMenu('subject', '${s}')">${s}</div>`
+            ).join('') + `<div class="px-3 py-2 text-xs text-red-600 hover:bg-red-50 cursor-pointer font-bold border-t border-gray-200" onclick="assignFromMenu('subject', '')">Clear</div>`;
+
+            listPrimary.innerHTML = contextNormalHTML;
+            listSubject.innerHTML = subjectHTML;
+
+            menu.style.left = `${event.clientX}px`;
+            menu.style.top = `${event.clientY}px`;
+            menu.classList.remove('hidden');
+            menu.style.display = 'flex'; 
+
+            const searchInput = document.getElementById('contextSearch');
+            searchInput.value = ""; filterContextMenu(); setTimeout(() => searchInput.focus(), 50);
+
+            const rect = menu.getBoundingClientRect();
+            if (rect.right > window.innerWidth) menu.style.left = `${window.innerWidth - rect.width - 10}px`;
+            if (rect.bottom > window.innerHeight) menu.style.top = `${window.innerHeight - rect.height - 10}px`;
+        }
+
+        document.addEventListener('click', function(e) {
+            const menu = document.getElementById('subjectContextMenu');
+            if (menu && !menu.contains(e.target) && !e.target.closest('.drop-zone')) {
+                menu.classList.add('hidden');
+                menu.style.display = 'none'; 
+            }
+        });
+
+        function assignFromMenu(type, value) {
+            if (!contextTargetCell) return;
+            
+            const mode = document.getElementById('viewMode').value;
+            const day = document.getElementById('daySelect').value;
+            const period = contextTargetCell.dataset.period;
+            const target = contextTargetCell.dataset.target; 
+
+            if (value === '') {
+                 pushState();
+                 if (type === 'subject') contextTargetCell.dataset.subject = '';
+                 else { contextTargetCell.dataset.class = ''; contextTargetCell.dataset.teacher = ''; contextTargetCell.dataset.subject = ''; }
+                 if (mode === 'teacher') contextTargetCell.innerHTML = renderCellContent(contextTargetCell.dataset.class, contextTargetCell.dataset.subject);
+                 else contextTargetCell.innerHTML = renderCellContent(contextTargetCell.dataset.teacher, contextTargetCell.dataset.subject);
+                 
+                 const menu = document.getElementById('subjectContextMenu');
+                 if(menu) { menu.classList.add('hidden'); menu.style.display = 'none'; }
+                 triggerAutoSave();
+                 return;
+            }
+
+            let teacherToCheck = null;
+            if (type === 'teacher') teacherToCheck = value;
+            else if (mode === 'teacher') teacherToCheck = target;
+            else teacherToCheck = contextTargetCell.dataset.teacher; 
+
+            const executeMenuAssignment = () => {
+                pushState(); 
+                if (type === 'subject') contextTargetCell.dataset.subject = value || '';
+                else if (type === 'class') { contextTargetCell.dataset.class = value || ''; if (mode === 'teacher') contextTargetCell.dataset.teacher = target; } 
+                else if (type === 'teacher') { contextTargetCell.dataset.teacher = value || ''; if (mode === 'class') contextTargetCell.dataset.class = target; }
+                
+                if (mode === 'teacher') contextTargetCell.innerHTML = renderCellContent(contextTargetCell.dataset.class, contextTargetCell.dataset.subject);
+                else contextTargetCell.innerHTML = renderCellContent(contextTargetCell.dataset.teacher, contextTargetCell.dataset.subject);
+
+                const menu = document.getElementById('subjectContextMenu');
+                menu.classList.add('hidden'); menu.style.display = 'none'; 
+                triggerAutoSave();
+            };
+
+            if (teacherToCheck && teacherToCheck !== 'undefined' && value !== '') {
+                if (checkTeacherStreakWarning(teacherToCheck, day, period, contextTargetCell)) {
+                    showStreakModal(
+                        `Warning: Assigning <b>${teacherToCheck}</b> to the <b>${period}</b> period will create a streak of 3+ continuous classes.`,
+                        () => { executeMenuAssignment(); }
+                    );
+                    return; 
+                }
+            }
+            executeMenuAssignment(); 
+        }
+
+        function filterContextMenu() {
+            const query = document.getElementById('contextSearch').value.toLowerCase();
+            document.querySelectorAll('#contextMenuListPrimary .menu-item, #contextMenuListSubject .menu-item').forEach(el => {
+                if (el.innerText.toLowerCase().includes(query)) el.style.display = 'block';
+                else el.style.display = 'none';
+            });
+        }
+        function getUnallottedClasses(day, period) {
+            let allotted = (window.appData.routineData || []).filter(r => r[0] === day && r[1] === period).map(r => r[2]);
+            return (window.appData.classes || []).filter(c => !allotted.includes(c));
+        }
+        function applySameAsPrevious() {
+            if (!contextPreviousData || !contextTargetCell) return;
+            const mode = document.getElementById('viewMode').value;
+            assignFromMenu('subject', contextPreviousData.s);
+            if (mode === 'teacher') assignFromMenu('class', contextPreviousData.c);
+            else assignFromMenu('teacher', contextPreviousData.t);
+        }
+        function toggleSuggestions() {
+            const isChecked = document.getElementById('bestSuggestionCheckbox').checked;
+            document.getElementById('contextMenuListPrimary').innerHTML = isChecked ? contextSuggestedHTML : contextNormalHTML;
+        }
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebarPalette');
+            const icon = document.getElementById('sidebarToggleIcon');
+            if (sidebar.classList.contains('w-52')) {
+                sidebar.classList.remove('w-52', 'p-2', 'border-r'); sidebar.classList.add('w-0', 'p-0', 'border-none', 'opacity-0');
+                icon.classList.replace('fa-chevron-left', 'fa-chevron-right');
+            } else {
+                sidebar.classList.add('w-52', 'p-2', 'border-r'); sidebar.classList.remove('w-0', 'p-0', 'border-none', 'opacity-0');
+                icon.classList.replace('fa-chevron-right', 'fa-chevron-left');
+            }
+        }
+        
+        async function initializeSubstitutionSync() {
+            const activeClient = typeof dbClient !== 'undefined' ? dbClient : (typeof supabaseClient !== 'undefined' ? supabaseClient : (typeof supabase !== 'undefined' ? supabase : null));
+            if (!activeClient) return;
+            const numericSchoolId = parseInt(sessionStorage.getItem('schoolId') || localStorage.getItem('schoolId') || '1', 10);
+
+            activeClient
+                .channel('substitution-sync-school-' + numericSchoolId)
+                .on(
+                    'postgres_changes',
+                    {
+                        event: '*',
+                        schema: 'public',
+                        table: 'exam_db',
+                        filter: 'school_id=eq.' + numericSchoolId
+                    },
+                    function () {
+                        if (typeof fetchTeacherData === 'function') fetchTeacherData();
+                        fetchSubstitutionHistory();
+                        fetchExclusions();
+                        fetchLeaveRequests();
+                    }
+                )
+                .subscribe();
+        }
+
+        /* =====================================================
+           DB DEBUG VIEWER (AUTO-DETECT CLIENT)
+        ===================================================== */
+        async function debugFetchExamDB() {
+            const modal = document.getElementById('debugModal');
+            const output = document.getElementById('debugOutput');
+            modal.classList.remove('hidden');
+            output.textContent = "Fetching data from Supabase exam_db...";
+
+            try {
+                const activeClient = typeof dbClient !== 'undefined' ? dbClient : 
+                                     (typeof supabaseClient !== 'undefined' ? supabaseClient : 
+                                     (typeof supabase !== 'undefined' ? supabase : null));
+
+                if (!activeClient) {
+                    throw new Error("Supabase client not found. Please verify that 'supabase-config.js' is loaded correctly.");
+                }
+                
+                const activeSchoolId = parseInt(sessionStorage.getItem('schoolId') || localStorage.getItem('schoolId') || '1', 10);
+                
+                const { data, error } = await activeClient
+                    .from('exam_db')
+                    .select('*')
+                    .eq('school_id', activeSchoolId);
+
+                if (error) throw error;
+
+                const formattedData = data.map(row => {
+                    let payload = row.json_payload;
+                    if (typeof payload === 'string') {
+                        try { payload = JSON.parse(payload); } catch(e) {}
+                    }
+                    return {
+                        id: row.id,
+                        school_id: row.school_id,
+                        data_key: row.data_key,
+                        json_payload: payload
+                    };
+                });
+
+                output.textContent = JSON.stringify(formattedData, null, 2);
+            } catch (error) {
+                output.textContent = "ERROR: " + error.message + "\n\n" + JSON.stringify(error, null, 2);
+            }
+        }
+
+/* =====================================================
+           AUTO GENERATOR ALGORITHM (WITH LOCAL SAVE)
+        ===================================================== */
+
+        // --- MAXIMIZE / RESTORE AUTO GEN MODAL ---
+        function toggleMaximizeAutoGen() {
+            const modalOverlay = document.getElementById('autoGenModal');
+            const modalContent = document.getElementById('autoGenModalContent');
+            const icon = document.querySelector('#btnMaximizeAutoGen i');
+            
+            if (modalContent.classList.contains('max-w-5xl')) {
+                // Maximize Mode
+                modalContent.classList.remove('max-w-5xl', 'h-[90vh]', 'rounded-xl');
+                modalContent.classList.add('max-w-none', 'w-full', 'h-screen', 'rounded-none');
+                modalOverlay.classList.remove('p-4');
+                modalOverlay.classList.add('p-0');
+                
+                icon.classList.remove('fa-expand');
+                icon.classList.add('fa-compress');
+                document.getElementById('btnMaximizeAutoGen').title = "Restore";
+            } else {
+                // Restore Default Mode
+                modalContent.classList.remove('max-w-none', 'w-full', 'h-screen', 'rounded-none');
+                modalContent.classList.add('max-w-5xl', 'h-[90vh]', 'rounded-xl');
+                modalOverlay.classList.remove('p-0');
+                modalOverlay.classList.add('p-4');
+                
+                icon.classList.remove('fa-compress');
+                icon.classList.add('fa-expand');
+                document.getElementById('btnMaximizeAutoGen').title = "Maximize";
+            }
+        }
+       
+function clearCurrentDay() {
+            const currentDay = document.getElementById('daySelect').value;
+            if(!confirm(`Are you sure you want to clear ALL routines for ${currentDay}?`)) return;
+            pushState(); // Save state for Undo
+            window.appData.routineData = (window.appData.routineData || []).filter(r => r[0] !== currentDay);
+            renderGrid();
+            triggerAutoSave();
+        }
+
+        // --- AUTO GEN OPEN MODAL ---
+        
+      function openAutoGenModal() {
+            document.getElementById('autoGenModal').classList.remove('hidden');
+            
+            // 1. Render Class Rules (Ends & Allowed Subjects) - DEFAULTS TO UNCHECKED
+            let classHtml = '';
+            (window.appData.classes || []).forEach(c => {
+                const safeC = c.replace(/[^a-zA-Z0-9]/g, '_');
+                const subChecks = (window.appData.subjects || []).map(s => {
+                    return `<label class="mr-2 mb-1 inline-flex items-center gap-1 cursor-pointer bg-white px-1.5 py-0.5 rounded border border-gray-200 shadow-sm"><input type="checkbox" class="autogen-cls-sub-${safeC}" value="${s}"> ${s}</label>`;
+                }).join('');
+
+                classHtml += `
+                <div class="border border-gray-300 p-2 rounded shadow-sm bg-white mb-2">
+                    <div class="flex justify-between items-center border-b border-gray-100 pb-1 mb-1">
+                        <span class="text-xs font-black text-indigo-900">${c}</span>
+                        <select id="autogen-end-${safeC}" class="border border-gray-300 rounded text-[10px] p-0.5 font-bold text-indigo-700 bg-gray-50 shadow-sm outline-none">
+                            ${PERIODS.map(p => `<option value="${p}" ${p==='8th'?'selected':''}>Up to ${p}</option>`).join('')}
+                        </select>
+                    </div>
+                    <div class="text-[10px] text-gray-600 font-medium leading-tight">
+                        <div class="flex flex-wrap mt-1">${subChecks}</div>
+                    </div>
+                </div>`;
+            });
+            document.getElementById('autoGenClassList').innerHTML = classHtml;
+
+            // 2. Render Teacher Constraints - DEFAULTS TO UNCHECKED
+            let teacherHtml = '';
+            (window.appData.teachers || []).forEach(t => {
+                const safeT = t.replace(/[^a-zA-Z0-9]/g, '_');
+                const isExcluded = excludedTeachers.has(t) ? 'checked' : ''; 
+                
+                const subChecks = (window.appData.subjects || []).map(s => {
+                    return `<label class="mr-2 mb-1 inline-flex items-center gap-1 cursor-pointer bg-gray-100 px-1.5 py-0.5 rounded border border-gray-200"><input type="checkbox" class="autogen-sub-${safeT}" value="${s}"> ${s}</label>`;
+                }).join('');
+
+                const clsChecks = (window.appData.classes || []).map(c => {
+                    const safeC = c.replace(/[^a-zA-Z0-9]/g, '_');
+                    return `
+                    <label class="flex items-center justify-between border border-gray-200 p-1 bg-gray-50 rounded">
+                        <div class="flex items-center gap-1">
+                            <input type="checkbox" class="autogen-cls-${safeT}" value="${c}" onchange="document.getElementById('max-${safeT}-${safeC}').disabled = !this.checked"> 
+                            <span class="truncate w-14 font-bold text-gray-700" title="${c}">${c}</span> 
+                        </div>
+                        <input type="number" id="max-${safeT}-${safeC}" value="8" min="1" max="20" class="w-10 border border-gray-300 text-center rounded outline-none" title="Max per week for this class" disabled>
+                    </label>`;
+                }).join('');
+
+                teacherHtml += `
+                <div class="border border-gray-300 p-2 rounded shadow-sm bg-white">
+                    <div class="flex justify-between items-center mb-2 pb-1 border-b border-gray-100">
+                        <span class="font-black text-indigo-900">${t}</span>
+                        <label class="text-[10px] text-red-600 font-bold flex items-center gap-1 bg-red-50 px-2 py-0.5 rounded border border-red-100 cursor-pointer">
+                            <input type="checkbox" class="autogen-exclude" value="${t}" ${isExcluded}> Do Not Pick
+                        </label>
+                    </div>
+                    <div class="text-[10px] mb-2 text-gray-600 font-medium leading-tight border-b border-gray-100 pb-2">
+                        <b class="text-gray-800 uppercase block mb-1">Allowed Subjects:</b> 
+                        <div class="flex flex-wrap">${subChecks}</div>
+                    </div>
+                    <div class="text-[10px]">
+                        <b class="text-gray-800 uppercase block mb-1">Allowed Classes & Max Week Load:</b>
+                        <div class="grid grid-cols-2 gap-1.5 mt-1">${clsChecks}</div>
+                    </div>
+                </div>`;
+            });
+            document.getElementById('autoGenTeacherList').innerHTML = teacherHtml;
+
+            // 3. LOAD SAVED SETTINGS FROM SUPABASE OBJECT
+            try {
+                const saved = window.appData.autoGenSettings || {};
+                
+                if (saved.scope) document.getElementById('autogen-scope').value = saved.scope;
+                if (saved.mode) document.getElementById('autogen-mode').value = saved.mode;
+                if (saved.avoidRepeat !== undefined) document.getElementById('autogen-avoid-repeat').checked = saved.avoidRepeat;
+                if (saved.avoidRepeatSubject !== undefined) document.getElementById('autogen-avoid-repeat-subject').checked = saved.avoidRepeatSubject;
+
+                if (saved.classEnds) {
+                    for (let c in saved.classEnds) {
+                        let el = document.getElementById(`autogen-end-${c.replace(/[^a-zA-Z0-9]/g, '_')}`);
+                        if (el) el.value = saved.classEnds[c];
+                    }
+                }
+
+                if (saved.classSubjects) {
+                    for (let c in saved.classSubjects) {
+                        let safeC = c.replace(/[^a-zA-Z0-9]/g, '_');
+                        document.querySelectorAll(`.autogen-cls-sub-${safeC}`).forEach(cb => {
+                            cb.checked = saved.classSubjects[c].includes(cb.value);
+                        });
+                    }
+                }
+
+                if (saved.teachers) {
+                    for (let t in saved.teachers) {
+                        let safeT = t.replace(/[^a-zA-Z0-9]/g, '_');
+                        let tData = saved.teachers[t];
+                        
+                        let exEl = document.querySelector(`.autogen-exclude[value="${t}"]`);
+                        if (exEl) exEl.checked = tData.excluded;
+
+                        document.querySelectorAll(`.autogen-sub-${safeT}`).forEach(cb => {
+                            cb.checked = tData.subjects.includes(cb.value);
+                        });
+
+                        document.querySelectorAll(`.autogen-cls-${safeT}`).forEach(cb => {
+                            let c = cb.value;
+                            let safeC = c.replace(/[^a-zA-Z0-9]/g, '_');
+                            let isAssigned = tData.classes.includes(c);
+                            cb.checked = isAssigned;
+                            
+                            let maxEl = document.getElementById(`max-${safeT}-${safeC}`);
+                            if (maxEl) {
+                                maxEl.disabled = !isAssigned;
+                                if (tData.maxLimits && tData.maxLimits[c] !== undefined) {
+                                    maxEl.value = tData.maxLimits[c];
+                                }
+                            }
+                        });
+                    }
+                }
+            } catch(e) { console.error("Error loading auto-gen settings", e); }
+        }
+
+        // --- AUTO GEN RUNNER (ASYNC FOR DB SAVE) ---
+       // --- AUTO GEN RUNNER (ASYNC FOR DB SAVE) ---
+        async function runAutoGenerate() {
+            const scope = document.getElementById('autogen-scope').value;
+            const mode = document.getElementById('autogen-mode').value;
+            const currentDay = document.getElementById('daySelect').value;
+            const avoidRepeat = document.getElementById('autogen-avoid-repeat').checked;
+            const avoidRepeatSubject = document.getElementById('autogen-avoid-repeat-subject').checked; 
+            
+            const settingsToSave = {
+                scope, mode, avoidRepeat, avoidRepeatSubject,
+                classEnds: {},
+                classSubjects: {},
+                teachers: {}
+            };
+
+            const excludedArray = Array.from(document.querySelectorAll('.autogen-exclude:checked')).map(cb => cb.value);
+            
+            const classEndPeriods = {};
+            const classSubjects = {};
+            
+            // Gather Class Rules
+            (window.appData.classes || []).forEach(c => {
+                const safeC = c.replace(/[^a-zA-Z0-9]/g, '_');
+                
+                const val = document.getElementById(`autogen-end-${safeC}`).value;
+                classEndPeriods[c] = val;
+                settingsToSave.classEnds[c] = val; 
+
+                const subs = Array.from(document.querySelectorAll(`.autogen-cls-sub-${safeC}:checked`)).map(cb => cb.value);
+                // FIX: If no subjects are checked, assume all subjects are allowed for the class
+                classSubjects[c] = subs.length > 0 ? subs : [...(window.appData.subjects || [])]; 
+                settingsToSave.classSubjects[c] = subs; // Save user's explicit choices
+            });
+
+            // Gather Teacher Configs
+            const teacherConfig = {};
+            (window.appData.teachers || []).forEach(t => {
+                const safeT = t.replace(/[^a-zA-Z0-9]/g, '_');
+                const isExcluded = excludedArray.includes(t);
+                
+                let subs = Array.from(document.querySelectorAll(`.autogen-sub-${safeT}:checked`)).map(cb => cb.value);
+                // FIX: If no subjects are checked, assume teacher can teach anything (or just use general list)
+                if (subs.length === 0) subs = [...(window.appData.subjects || [])];
+
+                const classLimits = {};
+                const assignedClassesForSave = [];
+                
+                Array.from(document.querySelectorAll(`.autogen-cls-${safeT}`)).forEach(cb => {
+                    const c = cb.value;
+                    const safeC = c.replace(/[^a-zA-Z0-9]/g, '_');
+                    // FIX: If unchecked, assume 0 limit so they don't get assigned. If disabled, skip.
+                    if (cb.checked) {
+                        assignedClassesForSave.push(c);
+                        classLimits[c] = parseInt(document.getElementById(`max-${safeT}-${safeC}`).value) || 8;
+                    }
+                });
+
+                settingsToSave.teachers[t] = {
+                    excluded: isExcluded,
+                    subjects: Array.from(document.querySelectorAll(`.autogen-sub-${safeT}:checked`)).map(cb => cb.value), // Save explicit choices
+                    classes: assignedClassesForSave,
+                    maxLimits: classLimits
+                };
+
+                if (isExcluded) return; 
+
+                teacherConfig[t] = { subjects: subs, classLimits: classLimits, assignedCount: {} };
+                for(let c in classLimits) teacherConfig[t].assignedCount[c] = 0;
+            });
+
+            // 1. Save locally to memory
+            window.appData.autoGenSettings = settingsToSave;
+
+            // 2. Upload settings back to Supabase Server
+            try {
+                const activeSchoolId = parseInt(sessionStorage.getItem('schoolId') || localStorage.getItem('schoolId') || '1', 10);
+                const activeClient = typeof dbClient !== 'undefined' ? dbClient : (typeof supabaseClient !== 'undefined' ? supabaseClient : (typeof supabase !== 'undefined' ? supabase : null));
+
+                if (activeClient) {
+                    const payloadStr = JSON.stringify(settingsToSave);
+                    const { data: existing } = await activeClient.from('exam_db')
+                        .select('id').eq('school_id', activeSchoolId).eq('data_key', 'autoGenSettings').limit(1);
+
+                    if (existing && existing.length > 0) {
+                        await activeClient.from('exam_db').update({ json_payload: payloadStr }).eq('id', existing[0].id);
+                    } else {
+                        await activeClient.from('exam_db').insert({ school_id: activeSchoolId, data_key: 'autoGenSettings', json_payload: payloadStr });
+                    }
+                }
+            } catch(e) { console.error("Error saving auto-gen settings to Supabase", e); }
+
+
+            if(!confirm(`You are about to Auto-Generate the routine.\nScope: ${scope === 'DAY' ? currentDay : 'Whole Week'}\nMode: ${mode === 'FILL' ? 'Fill Empty Slots' : 'Overwrite Existing Slots'}\n\nProceed?`)) return;
+
+            pushState();
+
+            let newRoutine = [];
+            
+            if (mode === 'FILL' || scope === 'DAY') {
+                newRoutine = [...(window.appData.routineData || [])];
+                if (mode === 'OVERWRITE' && scope === 'DAY') {
+                    newRoutine = newRoutine.filter(r => r[0] !== currentDay);
+                }
+            }
+
+            newRoutine.forEach(r => {
+                const t = r[5]; const c = r[2];
+                if (teacherConfig[t] && teacherConfig[t].assignedCount[c] !== undefined) {
+                    teacherConfig[t].assignedCount[c]++;
+                }
+            });
+
+            const targetDays = scope === 'ALL' ? DAYS : [currentDay];
+            let dailyAssignment = {}; 
+            let dailySubjects = {}; 
+
+            targetDays.forEach(day => {
+                dailyAssignment[day] = {};
+                dailySubjects[day] = {};
+
+                (window.appData.classes || []).forEach(c => {
+                    dailyAssignment[day][c] = [];
+                    dailySubjects[day][c] = [];
+                    
+                    newRoutine.forEach(r => {
+                        if (r[0] === day && r[2] === c) {
+                            if (r[5]) dailyAssignment[day][c].push(r[5]);
+                            if (r[4]) dailySubjects[day][c].push(r[4]); 
+                        }
+                    });
+                });
+
+                PERIODS.forEach(period => {
+                    (window.appData.classes || []).forEach(c => {
+                        const endP = classEndPeriods[c];
+                        if (PERIODS.indexOf(period) > PERIODS.indexOf(endP)) return;
+
+                        if (mode === 'FILL') {
+                            const existing = newRoutine.find(r => r[0] === day && r[1] === period && r[2] === c);
+                            if (existing) return; 
+                        }
+
+                        // Find candidates
+                        let candidates = Object.keys(teacherConfig).filter(t => {
+                            const tConf = teacherConfig[t];
+                            
+                            // Does this teacher teach this class?
+                            if (tConf.classLimits[c] === undefined) return false;
+                            
+                            // Has the teacher reached their weekly max for this class?
+                            if (tConf.assignedCount[c] >= tConf.classLimits[c]) return false; 
+                            
+                            // Valid Subjects match?
+                            const validSubjectsForClass = classSubjects[c] || [];
+                            const teacherSubjects = tConf.subjects || [];
+                            let overlappingSubjects = teacherSubjects.filter(sub => validSubjectsForClass.includes(sub));
+                            
+                            if (overlappingSubjects.length === 0) return false; 
+                            
+                            // Busy check
+                            const busy = newRoutine.find(r => r[0] === day && r[1] === period && r[5] === t);
+                            if (busy) return false; 
+                            
+                            // Daily Repeat check
+                            if (avoidRepeat && dailyAssignment[day][c].includes(t)) return false; 
+                            
+                            // Subject Repeat check
+                            if (avoidRepeatSubject) {
+                                let availableSubjects = overlappingSubjects.filter(sub => !dailySubjects[day][c].includes(sub));
+                                if (availableSubjects.length === 0) return false; 
+                            }
+
+                            // AVOID 3-CLASS STREAK IN MEMORY
+                            let dayTimes = (window.appData.routineTimes || []).filter(rt => rt[0] === day);
+                            let tiffinConfig = dayTimes.find(rt => rt[1] === 'Tiffin');
+                            let tiffinAfter = tiffinConfig ? tiffinConfig[2] : '4th';
+
+                            let assignedPeriods = newRoutine.filter(r => r[0] === day && r[5] === t).map(r => r[1]);
+                            assignedPeriods.push(period);
+
+                            let consecutiveCount = 0;
+                            let isStreak = false;
+
+                            PERIODS.forEach((p, index) => {
+                                if (assignedPeriods.includes(p)) {
+                                    if (index > 0 && PERIODS[index - 1] === tiffinAfter) { consecutiveCount = 1; } 
+                                    else { consecutiveCount++; }
+                                    if (consecutiveCount >= 3) isStreak = true;
+                                } else { consecutiveCount = 0; }
+                            });
+
+                            if (isStreak) return false; 
+                            return true;
+                        });
+
+                        if (candidates.length > 0) {
+                            candidates.sort(() => Math.random() - 0.5); 
+                            const pickedTeacher = candidates[0];
+                            const tConf = teacherConfig[pickedTeacher];
+                            
+                            const validSubjectsForClass = classSubjects[c] || [];
+                            let possibleSubjects = tConf.subjects.filter(sub => validSubjectsForClass.includes(sub));
+                            
+                            if (avoidRepeatSubject) {
+                                let unassigned = possibleSubjects.filter(sub => !dailySubjects[day][c].includes(sub));
+                                if (unassigned.length > 0) possibleSubjects = unassigned; 
+                            }
+                            
+                            const subject = possibleSubjects.length > 0 ? possibleSubjects[Math.floor(Math.random() * possibleSubjects.length)] : "";
+
+                            newRoutine.push([day, period, c, 'A', subject, pickedTeacher]);
+                            tConf.assignedCount[c]++;
+                            dailyAssignment[day][c].push(pickedTeacher);
+                            if (subject) dailySubjects[day][c].push(subject);
+                        }
+                    });
+                });
+            });
+
+            window.appData.routineData = newRoutine;
+            document.getElementById('autoGenModal').classList.add('hidden');
+            renderGrid();
+            triggerAutoSave(); 
+            
+            alert("Suggestion applied! Review the grid. Click 'Undo' to revert if you aren't happy, or 'Save' to ensure it uploads.");
+        }
+
+
+    </script>
+</body>
+</html>

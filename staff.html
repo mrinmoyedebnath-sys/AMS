@@ -1,0 +1,765 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Staff Portal - Patkabari High School</title>
+    
+    <!-- LIBRARIES -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+
+    <style>
+        .hidden { display: none !important; }
+        
+        /* Loading Overlay */
+        #loading-overlay { position: fixed; inset: 0; background: #f8fafc; z-index: 9999999; display: flex; justify-content: center; align-items: center; flex-direction: column; transition: opacity 0.4s ease; }
+        .logo-spinner-container { position:relative; width:80px; height:80px; margin:0 auto 15px auto; display:flex; justify-content:center; align-items:center; }
+        .logo-spinner { position:absolute; width:100%; height:100%; border:4px solid #e2e8f0; border-top:4px solid #3b82f6; border-radius:50%; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        /* Custom Scrollbar */
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+        @media print {
+            .no-print { display: none !important; }
+            body { background: white; }
+            .print-full-width { grid-column: span 3 / span 3 !important; border: none !important; box-shadow: none !important; }
+            table { width: 100% !important; border-collapse: collapse; }
+            th, td { border: 1px solid #000 !important; color: #000 !important; }
+        }
+
+        #substitutionTicker { position: relative; }
+        #substitutionTickerTrack { display: inline-block; min-width: 100%; padding-left: 100%; animation: substitutionScroll 25s linear infinite; }
+        #substitutionTickerTrack:hover { animation-play-state: paused; }
+        @keyframes substitutionScroll {
+            0% { transform: translateX(0); }
+            100% { transform: translateX(-100%); }
+        }
+    </style>
+</head>
+<body class="bg-slate-50 h-screen flex flex-col overflow-hidden font-sans text-slate-800 text-xs md:text-sm">
+
+    <!-- LOADING OVERLAY -->
+    <div id="loading-overlay">
+        <div class="logo-spinner-container">
+            <div class="logo-spinner"></div>
+            <i class="fas fa-chalkboard-teacher text-2xl text-blue-600 z-10"></i>
+        </div>
+        <h2 class="text-blue-700 font-black text-sm tracking-wide">Syncing Staff Data...</h2>
+        <p class="text-[10px] text-slate-500 font-bold mt-1">Fetching Routine & Provisional Data</p>
+    </div>
+
+    <!-- TOP NAVIGATION HEADER -->
+    <div class="bg-blue-800 text-white shadow-md p-3 flex flex-wrap justify-between items-center shrink-0 border-b-4 border-blue-500 no-print gap-2">
+        <div class="flex items-center gap-3">
+            <div class="bg-white p-2 rounded-full shadow-inner hidden sm:block">
+                <i class="fas fa-user-tie text-blue-800 text-base"></i>
+            </div>
+            <div>
+                <h1 class="text-sm md:text-lg font-black tracking-tight truncate max-w-[200px] md:max-w-none" id="teacherDashWelcomeTitle">Welcome, Staff</h1>
+                <p class="text-[10px] text-blue-200 font-bold uppercase tracking-wider">Patkabari High School</p>
+            </div>
+        </div>
+        <div class="flex items-center gap-1.5 ml-auto">
+            <button onclick="debugFetchExamDB()" class="bg-purple-600 hover:bg-purple-500 text-white px-2.5 py-1.5 rounded shadow text-[10px] md:text-xs font-black transition-colors flex items-center">
+                <i class="fas fa-database mr-1"></i> <span class="hidden sm:inline">View</span> DB
+            </button>
+            <button onclick="window.print()" class="bg-blue-600 hover:bg-blue-500 text-white px-2.5 py-1.5 rounded shadow text-[10px] md:text-xs font-bold transition-colors hidden md:flex items-center">
+                <i class="fas fa-print mr-1"></i> Print
+            </button>
+            <button onclick="customLogout()" class="bg-red-600 hover:bg-red-500 text-white px-2.5 py-1.5 rounded shadow text-[10px] md:text-xs font-black transition-colors flex items-center">
+                <i class="fas fa-sign-out-alt mr-1"></i> Logout
+            </button>
+        </div>
+    </div>
+
+    <!-- MAIN DASHBOARD CONTENT -->
+    <div class="p-3 md:p-6 max-w-7xl mx-auto w-full flex-1 flex flex-col gap-4 overflow-y-auto">
+        
+        <!-- METRICS ROW -->
+        <div class="grid grid-cols-3 gap-2 md:gap-4 shrink-0 no-print">
+            <div class="bg-white p-3 rounded-lg shadow-sm border border-slate-200 flex flex-col sm:flex-row items-center sm:justify-between border-l-4 border-l-blue-500 text-center sm:text-left">
+                <div>
+                    <h3 class="text-[9px] md:text-xs font-bold text-slate-500 uppercase mb-0.5">Weekly Classes</h3>
+                    <p class="text-lg md:text-2xl font-black text-blue-700" id="metricTotalClasses">0</p>
+                </div>
+                <i class="fas fa-chalkboard text-xl md:text-3xl text-blue-50 hidden sm:block"></i>
+            </div>
+            
+            <div class="bg-white p-3 rounded-lg shadow-sm border border-slate-200 flex flex-col sm:flex-row items-center sm:justify-between border-l-4 border-l-amber-500 text-center sm:text-left">
+                <div>
+                    <h3 class="text-[9px] md:text-xs font-bold text-slate-500 uppercase mb-0.5">Today's Proxy</h3>
+                    <p class="text-lg md:text-2xl font-black text-amber-600" id="metricProvisional">0</p>
+                </div>
+                <i class="fas fa-clipboard-list text-xl md:text-3xl text-amber-50 hidden sm:block"></i>
+            </div>
+
+            <div class="bg-white p-3 rounded-lg shadow-sm border border-slate-200 flex flex-col sm:flex-row items-center sm:justify-between border-l-4 border-l-emerald-500 text-center sm:text-left">
+                <div>
+                    <h3 class="text-[9px] md:text-xs font-bold text-slate-500 uppercase mb-0.5">Leave Balance</h3>
+                    <p class="text-xs md:text-base font-black text-emerald-600 mt-1">CL:14 <span class="text-slate-300">|</span> ML:15</p>
+                </div>
+                <i class="fas fa-calendar-check text-xl md:text-3xl text-emerald-50 hidden sm:block"></i>
+            </div>
+        </div>
+
+        <!-- TICKER BAR -->
+        <div id="substitutionTicker" class="w-full bg-amber-50 border-y border-amber-300 overflow-hidden rounded shadow-sm no-print">
+            <div id="substitutionTickerTrack" class="whitespace-nowrap py-1.5 text-xs font-bold text-amber-900">
+                Loading substitution duties...
+            </div>
+        </div>
+
+        <!-- TWO COLUMN LAYOUT -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 flex-1 min-h-0">
+            
+            <!-- LEFT/MAIN COLUMN: MASTER ROUTINE & PROVISIONAL TABLE -->
+            <div class="flex flex-col gap-4 lg:col-span-2 print-full-width">
+                
+                <!-- MASTER ROUTINE -->
+                <div class="bg-white rounded-lg shadow-sm border border-slate-200 flex flex-col overflow-hidden">
+                    <div class="bg-slate-100 p-3 border-b border-slate-200 flex justify-between items-center shrink-0">
+                        <h3 class="font-bold text-slate-800 text-xs md:text-sm uppercase tracking-wide">
+                            <i class="fas fa-calendar-alt text-blue-600 mr-1.5"></i>My Master Routine
+                        </h3>
+                        <span class="text-[9px] font-bold text-white bg-green-600 px-2 py-0.5 rounded-full shadow-sm">Synced</span>
+                    </div>
+                    
+                    <div class="overflow-x-auto p-1.5">
+                        <table class="w-full border-collapse text-[10px] md:text-xs text-center min-w-[550px]">
+                            <thead>
+                                <tr class="bg-slate-50 text-slate-700 border-b-2 border-slate-300">
+                                    <th class="p-2 border-r font-black uppercase text-left w-20">Day</th>
+                                    <th class="p-2 border-r font-bold">1st</th>
+                                    <th class="p-2 border-r font-bold">2nd</th>
+                                    <th class="p-2 border-r font-bold">3rd</th>
+                                    <th class="p-2 border-r font-bold">4th</th>
+                                    <th class="p-2 border-r font-bold">5th</th>
+                                    <th class="p-2 border-r font-bold">6th</th>
+                                    <th class="p-2 border-r font-bold">7th</th>
+                                    <th class="p-2 font-bold">8th</th>
+                                </tr>
+                            </thead>
+                            <tbody id="teacherDashRoutineBody">
+                                <!-- Populated by JavaScript -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- PROVISIONAL CLASSES TABLE -->
+                <div class="bg-white rounded-lg shadow-sm border border-slate-200 flex flex-col overflow-hidden border-t-4 border-amber-400">
+                    <div class="bg-amber-50 p-3 border-b border-amber-200 flex justify-between items-center shrink-0">
+                        <h3 class="font-bold text-amber-900 text-xs md:text-sm uppercase tracking-wide truncate max-w-[200px] md:max-w-none">
+                            <i class="fas fa-clipboard-user text-amber-600 mr-1.5"></i>Today's Provisional Classes
+                        </h3>
+                        <div class="flex items-center gap-1.5 shrink-0">
+                            <span class="text-[9px] font-bold text-amber-800 bg-amber-200 px-2 py-0.5 rounded-full shadow-sm" id="provisionalCountBadge">0 Assigned</span>
+                            <button onclick="openExtraClassModal()" class="text-[9px] md:text-[10px] font-bold text-white bg-blue-600 hover:bg-blue-500 px-2.5 py-1 rounded shadow-sm transition-colors flex items-center">
+                                <i class="fas fa-list-ul mr-1"></i> History
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="overflow-x-auto p-1.5">
+                        <table class="w-full border-collapse text-[10px] md:text-xs text-center min-w-[450px]">
+                            <thead>
+                                <tr class="bg-amber-100/70 text-amber-950 border-b-2 border-amber-300">
+                                    <th class="p-2 border-r border-amber-200 font-black uppercase tracking-wider">Period</th>
+                                    <th class="p-2 border-r border-amber-200 font-black uppercase tracking-wider">Class</th>
+                                    <th class="p-2 border-r border-amber-200 font-black uppercase tracking-wider">Subject</th>
+                                    <th class="p-2 font-black uppercase tracking-wider">Covering For</th>
+                                </tr>
+                            </thead>
+                            <tbody id="provisionalTableBody">
+                                <tr>
+                                    <td colspan="4" class="p-4 text-slate-400 font-semibold italic text-xs">No provisional duties assigned for today.</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- RIGHT COLUMN: ALERTS & FORMS -->
+            <div class="flex flex-col gap-4 no-print">
+                
+                <!-- PROVISIONAL NOTICES ALERTS -->
+                <div class="bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden">
+                    <div class="bg-amber-50 p-3 border-b border-amber-200 shrink-0 flex items-center">
+                        <i class="fas fa-bell text-amber-600 mr-1.5 animate-pulse"></i>
+                        <h3 class="font-bold text-amber-900 text-xs md:text-sm uppercase">Proxy Alerts</h3>
+                    </div>
+                    <div class="p-3 text-center flex flex-col gap-2" id="provisionalContainer">
+                        <div class="py-3">
+                            <i class="fas fa-check-circle text-3xl text-slate-200 mb-2"></i>
+                            <p class="text-xs text-slate-500 font-bold">No proxy duties assigned for today.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- LEAVE APPLICATION -->
+                <div class="bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden shrink-0">
+                    <div class="bg-slate-50 p-3 border-b border-slate-200 shrink-0">
+                        <h3 class="font-bold text-slate-700 text-xs md:text-sm uppercase">
+                            <i class="fas fa-envelope-open-text text-blue-600 mr-1.5"></i>Apply for Leave
+                        </h3>
+                    </div>
+                    <div class="p-3 md:p-4 flex flex-col gap-3">
+                        <div class="grid grid-cols-2 gap-2">
+                            <div>
+                                <label class="text-[10px] font-bold text-slate-600 block mb-1">Start Date</label>
+                                <input type="date" id="leaveStart" class="w-full border border-slate-300 p-1.5 rounded text-xs outline-none focus:border-blue-500 bg-slate-50">
+                            </div>
+                            <div>
+                                <label class="text-[10px] font-bold text-slate-600 block mb-1">End Date</label>
+                                <input type="date" id="leaveEnd" class="w-full border border-slate-300 p-1.5 rounded text-xs outline-none focus:border-blue-500 bg-slate-50">
+                            </div>
+                        </div>
+                        <div>
+                            <label class="text-[10px] font-bold text-slate-600 block mb-1">Leave Type</label>
+                            <select id="leaveType" class="w-full border border-slate-300 p-1.5 rounded text-xs outline-none focus:border-blue-500 bg-slate-50 font-semibold text-slate-700">
+                                <option value="Casual Leave (CL)">Casual Leave (CL)</option>
+                                <option value="Medical Leave (ML)">Medical Leave (ML)</option>
+                                <option value="Earned Leave (EL)">Earned Leave (EL)</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="text-[10px] font-bold text-slate-600 block mb-1">Reason (Optional)</label>
+                            <textarea id="leaveReason" rows="2" class="w-full border border-slate-300 p-1.5 rounded text-xs outline-none focus:border-blue-500 bg-slate-50 resize-none text-slate-700" placeholder="Brief reason..."></textarea>
+                        </div>
+                        <button onclick="submitLeaveApplication()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 rounded shadow transition-colors text-xs">
+                            Submit Application
+                        </button>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL OVERLAY FOR ALL EXTRA CLASSES -->
+    <div id="extraClassModal" class="fixed inset-0 bg-slate-900/60 z-[999999] hidden flex justify-center items-center p-3 backdrop-blur-sm transition-opacity duration-300">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-3xl flex flex-col max-h-[85vh] overflow-hidden border border-slate-200">
+            <div class="px-4 py-3 border-b border-slate-200 flex justify-between items-center bg-blue-50 shrink-0">
+                <h2 class="text-sm md:text-base font-black text-blue-900 flex items-center truncate">
+                    <i class="fas fa-list-ul text-blue-600 mr-2"></i> Proxy & Substitution History
+                </h2>
+                <button onclick="closeExtraClassModal()" class="text-blue-400 hover:text-red-600 bg-white rounded-full p-1.5 w-7 h-7 flex items-center justify-center shadow-sm transition-colors focus:outline-none">
+                    <i class="fas fa-times text-sm"></i>
+                </button>
+            </div>
+            <div class="p-3 md:p-4 overflow-y-auto flex-1 bg-slate-50 no-scrollbar">
+                <div class="bg-white rounded-lg border border-slate-200 shadow-sm overflow-x-auto">
+                    <table class="w-full border-collapse text-xs text-center min-w-[500px]">
+                        <thead>
+                            <tr class="bg-slate-100 text-slate-700 border-b-2 border-slate-300">
+                                <th class="p-2.5 border-r font-black uppercase tracking-wider">Date</th>
+                                <th class="p-2.5 border-r font-black uppercase tracking-wider">Role</th>
+                                <th class="p-2.5 border-r font-black uppercase tracking-wider">Period</th>
+                                <th class="p-2.5 border-r font-black uppercase tracking-wider">Class</th>
+                                <th class="p-2.5 border-r font-black uppercase tracking-wider">Subject</th>
+                                <th class="p-2.5 font-black uppercase tracking-wider text-red-700">Counterpart</th>
+                            </tr>
+                        </thead>
+                        <tbody id="extraClassModalBody">
+                            <tr><td colspan="6" class="p-4 text-slate-400 font-semibold italic text-xs">Loading records...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="px-4 py-2.5 border-t border-slate-200 bg-slate-100 flex justify-end shrink-0">
+                <button onclick="closeExtraClassModal()" class="bg-slate-600 hover:bg-slate-700 text-white px-4 py-1.5 rounded shadow font-bold text-xs transition-colors">
+                    Close Window
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- DB DEBUG MODAL -->
+    <div id="debugModal" class="fixed inset-0 bg-slate-900/80 z-[9999999] hidden flex justify-center items-center p-3 backdrop-blur-sm">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-4xl flex flex-col h-[85vh] overflow-hidden border border-slate-200">
+            <div class="px-4 py-3 border-b border-slate-200 flex justify-between items-center bg-purple-50 shrink-0">
+                <h2 class="text-sm md:text-base font-black text-purple-900 truncate"><i class="fas fa-database mr-1.5"></i> exam_db Contents</h2>
+                <button onclick="document.getElementById('debugModal').classList.add('hidden')" class="text-purple-400 hover:text-red-600 focus:outline-none">
+                    <i class="fas fa-times text-lg"></i>
+                </button>
+            </div>
+            <div class="p-3 overflow-y-auto flex-1 bg-slate-800 text-green-400 font-mono text-[10px] md:text-xs text-left">
+                <pre id="debugOutput">Loading...</pre>
+            </div>
+        </div>
+    </div>
+
+    <!-- CONFIG & LOGIC -->
+    <script src="supabase-config.js"></script>
+
+    <script>
+        const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+        const PERIODS = ["1st", "2nd", "3rd", "4th", "5th", "6th", "7th", "8th"];
+        
+        let currentStaffName = '';
+        let schoolId = '';
+        let myAllExtraClasses = []; 
+        
+        const dbClient = typeof supabaseClient !== 'undefined' ? supabaseClient : window.supabase;
+
+        window.addEventListener('DOMContentLoaded', async () => {
+            const role = sessionStorage.getItem('userRole') || localStorage.getItem('userRole');
+            currentStaffName = sessionStorage.getItem('loggedInUser') || localStorage.getItem('loggedInUser');
+            schoolId = sessionStorage.getItem('schoolId') || localStorage.getItem('schoolId') || '1';
+
+            if (role !== 'teacher' || !currentStaffName) {
+                window.location.href = 'index.html'; 
+                return;
+            }
+
+            document.getElementById('teacherDashWelcomeTitle').innerText = currentStaffName;
+
+            await fetchAllData(); 
+            await initializeSubstitutionSync();
+
+            document.getElementById('loading-overlay').classList.add('hidden');
+        });
+
+        function sanitizeName(name) {
+            return String(name || '').replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+        }
+
+        /* =====================================================
+           DB DEBUG VIEWER
+        ===================================================== */
+        async function debugFetchExamDB() {
+            const modal = document.getElementById('debugModal');
+            const output = document.getElementById('debugOutput');
+            modal.classList.remove('hidden');
+            output.textContent = "Fetching data from Supabase exam_db...";
+
+            try {
+                if (!dbClient) throw new Error("Supabase client missing.");
+                const numericSchoolId = parseInt(schoolId, 10) || 1;
+                
+                const { data, error } = await dbClient
+                    .from('exam_db')
+                    .select('*')
+                    .eq('school_id', numericSchoolId);
+
+                if (error) throw error;
+
+                const formattedData = data.map(row => {
+                    let payload = row.json_payload;
+                    if (typeof payload === 'string') {
+                        try { payload = JSON.parse(payload); } catch(e) {}
+                    }
+                    return {
+                        id: row.id,
+                        school_id: row.school_id,
+                        data_key: row.data_key,
+                        json_payload: payload
+                    };
+                });
+
+                output.textContent = JSON.stringify(formattedData, null, 2);
+            } catch (error) {
+                output.textContent = "ERROR: " + error.message + "\n\n" + JSON.stringify(error, null, 2);
+            }
+        }
+
+        /* =====================================================
+           UNIFIED DATA FETCH (ROUTINE + SUBSTITUTION HISTORY)
+        ===================================================== */
+        async function fetchAllData() {
+            try {
+                if (!dbClient) throw new Error("Database client not found. Check supabase-config.js");
+
+                const numericSchoolId = parseInt(schoolId, 10) || 1;
+
+                const { data, error } = await dbClient
+                    .from('exam_db')
+                    .select('id, school_id, data_key, json_payload')
+                    .eq('school_id', numericSchoolId);
+
+                if (error) throw error;
+
+                let allRoutineData = [];
+                let allAssignments = [];
+
+                if (data && data.length > 0) {
+                    data.forEach(row => {
+                        let payload = row.json_payload;
+                        if (typeof payload === 'string') {
+                            try { payload = JSON.parse(payload); } catch(e) {}
+                        }
+                        if (!payload) return;
+
+                        const key = String(row.data_key).toLowerCase().trim();
+
+                        if (key.includes('routine')) {
+                            if (Array.isArray(payload)) allRoutineData = allRoutineData.concat(payload);
+                            else if (payload.routineData && Array.isArray(payload.routineData)) allRoutineData = allRoutineData.concat(payload.routineData);
+                            else if (payload.data && Array.isArray(payload.data)) allRoutineData = allRoutineData.concat(payload.data);
+                        }
+
+                        if (key.includes('substitution') || key.includes('proxy') || key.includes('provisional')) {
+                            if (Array.isArray(payload)) {
+                                payload.forEach(item => {
+                                    if (Array.isArray(item)) {
+                                        allAssignments.push({
+                                            date: String(item[0] || '').trim(),
+                                            period: String(item[2] || '').trim(),
+                                            class: String(item[3] || '').trim(),
+                                            subject: String(item[4] || '').trim(),
+                                            absentTeacher: String(item[5] || '').trim(),
+                                            substituteTeacher: String(item[6] || '').trim()
+                                        });
+                                    } else if (typeof item === 'object' && item !== null) {
+                                        allAssignments.push({
+                                            date: String(item.date || item[0] || '').trim(),
+                                            period: String(item.period || item[2] || '').trim(),
+                                            class: String(item.class || item[3] || '').trim(),
+                                            subject: String(item.subject || item[4] || '').trim(),
+                                            absentTeacher: String(item.absentTeacher || item.originalTeacher || item[5] || '').trim(),
+                                            substituteTeacher: String(item.substituteTeacher || item.proxyTeacher || item[6] || '').trim()
+                                        });
+                                    }
+                                });
+                            }
+                        }
+                    });
+                }
+
+                renderMasterRoutine(allRoutineData);
+
+                const staffNameClean = sanitizeName(currentStaffName);
+
+                myAllExtraClasses = allAssignments.filter(duty => {
+                    const subClean = sanitizeName(duty.substituteTeacher);
+                    const absClean = sanitizeName(duty.absentTeacher);
+                    return subClean === staffNameClean || absClean === staffNameClean;
+                });
+                
+                myAllExtraClasses.sort((a, b) => new Date(a.date) - new Date(b.date));
+
+                const today = new Date();
+                const yyyy = today.getFullYear();
+                const mm = String(today.getMonth() + 1).padStart(2, '0');
+                const dd = String(today.getDate()).padStart(2, '0');
+                const todayISO = `${yyyy}-${mm}-${dd}`;
+                const fallbackISO = "2026-07-22";
+
+                const todayAssignments = myAllExtraClasses.filter(duty => {
+                    const dutyDate = String(duty.date || '').trim();
+                    const isToday = (dutyDate === todayISO || dutyDate === fallbackISO);
+                    const isSubstitute = sanitizeName(duty.substituteTeacher) === staffNameClean;
+                    return isToday && isSubstitute;
+                });
+
+                renderSubstitutionTicker(todayAssignments);
+                renderProvisionalDuties(todayAssignments);
+
+            } catch (err) {
+                console.error("Error fetching dashboard data:", err);
+                renderSubstitutionTicker([], true);
+            }
+        }
+
+        function renderMasterRoutine(routineData) {
+            const tbody = document.getElementById('teacherDashRoutineBody');
+            tbody.innerHTML = '';
+            let weeklyClassesCount = 0;
+            const staffNameClean = sanitizeName(currentStaffName);
+
+            DAYS.forEach(day => {
+                let rowHtml = `<tr class="border-b border-slate-200 hover:bg-white transition-colors">
+                                <td class="p-2 md:p-3 font-black text-slate-700 bg-slate-50 border-r border-slate-200 text-left">${day}</td>`;
+                
+                PERIODS.forEach(period => {
+                    const match = routineData.find(r => {
+                        if (!r) return false;
+                        const rTeacher = r[5] || r.teacher || r.Teacher || '';
+                        const rDay = r[0] || r.day || r.Day || '';
+                        const rPeriod = r[1] || r.period || r.Period || '';
+                        const cleanRTeacher = sanitizeName(rTeacher);
+                        
+                        return cleanRTeacher === staffNameClean && 
+                               String(rDay).trim().toLowerCase() === day.toLowerCase() && 
+                               String(rPeriod).trim().toLowerCase() === period.toLowerCase();
+                    });
+                    
+                    if (match) {
+                        weeklyClassesCount++;
+                        const className = match[2] || match.class || match.Class || 'N/A';
+                        const subjectName = match[4] || match.subject || match.Subject || 'N/A';
+                        
+                        rowHtml += `
+                            <td class="p-1.5 md:p-2 border-r border-slate-200 align-middle">
+                                <div class="bg-blue-50 border border-blue-200 rounded p-1 shadow-sm h-full flex flex-col justify-center items-center text-center">
+                                    <span class="font-black text-red-600 text-[10px] md:text-xs block leading-tight">${className}</span>
+                                    <span class="font-bold text-blue-800 text-[8px] md:text-[10px] uppercase block truncate w-full" title="${subjectName}">${subjectName}</span>
+                                </div>
+                            </td>`;
+                    } else {
+                        rowHtml += `<td class="p-1.5 md:p-2 border-r border-slate-200 align-middle text-slate-300 font-bold">-</td>`;
+                    }
+                });
+                
+                rowHtml += `</tr>`;
+                tbody.innerHTML += rowHtml;
+            });
+
+            document.getElementById('metricTotalClasses').innerText = weeklyClassesCount;
+        }
+
+        /* =====================================================
+           MODAL LOGIC
+        ===================================================== */
+        function openExtraClassModal() {
+            const modal = document.getElementById('extraClassModal');
+            const tbody = document.getElementById('extraClassModalBody');
+            
+            tbody.innerHTML = '';
+
+            if (myAllExtraClasses.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="6" class="p-6 text-slate-400 font-semibold italic text-xs">No extra classes found for you in the database.</td></tr>`;
+            } else {
+                let html = '';
+                const staffClean = sanitizeName(currentStaffName);
+
+                myAllExtraClasses.forEach(duty => {
+                    let date = duty.date || 'Unknown Date';
+                    let period = duty.period || 'Assigned';
+                    let cls = duty.class || 'N/A';
+                    let subject = duty.subject || '-';
+                    
+                    const subClean = sanitizeName(duty.substituteTeacher);
+                    const absClean = sanitizeName(duty.absentTeacher);
+                    
+                    let roleBadge = '';
+                    let counterpart = '';
+
+                    if (subClean === staffClean) {
+                        roleBadge = '<span class="bg-emerald-100 text-emerald-800 border border-emerald-300 px-1.5 py-0.5 rounded text-[9px] font-black uppercase">Substitute</span>';
+                        counterpart = `Covering for: <b>${duty.absentTeacher}</b>`;
+                    } else if (absClean === staffClean) {
+                        roleBadge = '<span class="bg-red-100 text-red-800 border border-red-300 px-1.5 py-0.5 rounded text-[9px] font-black uppercase">Absent</span>';
+                        counterpart = `Covered by: <b>${duty.substituteTeacher}</b>`;
+                    }
+
+                    const today = new Date();
+                    const todayISO = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+                    const isToday = (date === todayISO || date === '2026-07-22');
+                    
+                    const rowClass = isToday ? 'bg-amber-50 hover:bg-amber-100 font-bold border-l-4 border-l-amber-500' : 'hover:bg-slate-50';
+
+                    html += `
+                        <tr class="border-b border-slate-200 transition-colors ${rowClass}">
+                            <td class="p-2.5 text-slate-700 whitespace-nowrap">${date} ${isToday ? '<span class="ml-1 text-[9px] bg-amber-500 text-white px-1 py-0.5 rounded">Today</span>' : ''}</td>
+                            <td class="p-2.5">${roleBadge}</td>
+                            <td class="p-2.5 text-blue-900 font-bold">${period}</td>
+                            <td class="p-2.5 text-slate-900 font-black">Class ${cls}</td>
+                            <td class="p-2.5 text-slate-600">${subject}</td>
+                            <td class="p-2.5 text-slate-600">${counterpart}</td>
+                        </tr>
+                    `;
+                });
+                tbody.innerHTML = html;
+            }
+
+            modal.classList.remove('hidden');
+        }
+
+        function closeExtraClassModal() {
+            document.getElementById('extraClassModal').classList.add('hidden');
+        }
+
+        /* =====================================================
+           RENDER TICKER & DASHBOARD WINDOW
+        ===================================================== */
+        function renderSubstitutionTicker(duties, hasError = false) {
+            const track = document.getElementById('substitutionTickerTrack');
+            if (!track) return;
+
+            if (hasError) {
+                track.textContent = '⚠ Unable to synchronize substitution duties.';
+                return;
+            }
+
+            if (!duties || duties.length === 0) {
+                track.textContent = '✓ No provisional classes assigned to you today.';
+                return;
+            }
+
+            const messages = duties.map(duty => {
+                const period = duty.period || 'Assigned';
+                const className = duty.class || 'N/A';
+                const originalTeacher = duty.absentTeacher || 'Unknown';
+
+                let msg = '🔔 PROVISIONAL DUTY';
+                if (period) msg += ' | Period: ' + period;
+                if (className) msg += ' | Class: ' + className;
+                if (originalTeacher) msg += ' | For: ' + originalTeacher;
+                return msg;
+            });
+
+            track.textContent = messages.join('     ✦     ');
+        }
+
+        function renderProvisionalDuties(provisionalData) {
+            const totalDuties = provisionalData.length;
+            const container = document.getElementById('provisionalContainer');
+            const tableBody = document.getElementById('provisionalTableBody');
+            const countBadge = document.getElementById('provisionalCountBadge');
+            
+            document.getElementById('metricProvisional').innerText = totalDuties;
+            if (countBadge) countBadge.innerText = totalDuties + ' Assigned';
+
+            if (provisionalData.length > 0) {
+                let tableHtml = '';
+                provisionalData.forEach(duty => {
+                    let period = duty.period || 'Assigned';
+                    let cls = duty.class || 'N/A';
+                    let subject = duty.subject || '-';
+                    let absentTeacher = duty.absentTeacher || 'Not specified';
+
+                    tableHtml += `
+                        <tr class="border-b border-amber-100 hover:bg-amber-50/50 transition-colors">
+                            <td class="p-2.5 font-bold text-amber-900">${period}</td>
+                            <td class="p-2.5 font-black text-slate-800">Class ${cls}</td>
+                            <td class="p-2.5 font-semibold text-slate-600">${subject}</td>
+                            <td class="p-2.5 font-bold text-red-600">${absentTeacher}</td>
+                        </tr>
+                    `;
+                });
+                tableBody.innerHTML = tableHtml;
+            } else {
+                tableBody.innerHTML = `<tr><td colspan="4" class="p-4 text-slate-400 font-semibold italic text-xs">No provisional duties assigned for today.</td></tr>`;
+            }
+
+            if (totalDuties > 0) {
+                let html = `<div class="max-h-48 overflow-y-auto pr-1 flex flex-col gap-2 no-scrollbar"><ul class="text-left flex flex-col gap-2 w-full">`;
+                
+                provisionalData.forEach(duty => {
+                    let period = duty.period || 'Assigned';
+                    let cls = duty.class || 'N/A';
+                    let absentTeacher = duty.absentTeacher || '';
+                    const forText = absentTeacher ? `<span class="block text-[9px] text-amber-800 font-semibold mt-0.5">Covering for: ${absentTeacher}</span>` : '';
+
+                    html += `
+                        <li class="bg-amber-100 border border-amber-300 p-2 rounded text-xs flex justify-between items-center shadow-sm shrink-0">
+                            <div>
+                                <span class="font-black text-amber-900 block text-[9px] uppercase tracking-wider mb-0.5">Provisional Class</span>
+                                <span class="text-amber-950 font-black text-sm block leading-tight">Class ${cls}</span>
+                                <span class="text-amber-900 font-bold text-[10px] block mt-0.5">${period} Period</span>
+                                ${forText}
+                            </div>
+                            <i class="fas fa-exchange-alt text-amber-600 text-base shadow-sm rounded-full bg-white p-1"></i>
+                        </li>
+                    `;
+                });
+
+                html += `</ul></div>`;
+                container.innerHTML = html;
+            } else {
+                container.innerHTML = `
+                    <div class="py-3">
+                        <i class="fas fa-check-circle text-3xl text-slate-200 mb-2"></i>
+                        <p class="text-xs text-slate-500 font-bold">No proxy duties assigned for today.</p>
+                    </div>`;
+            }
+        }
+
+        async function initializeSubstitutionSync() {
+            if (!dbClient) return;
+            const numericSchoolId = parseInt(schoolId, 10) || 1;
+
+            dbClient
+                .channel('substitution-sync-school-' + numericSchoolId)
+                .on(
+                    'postgres_changes',
+                    {
+                        event: '*',
+                        schema: 'public',
+                        table: 'exam_db',
+                        filter: 'school_id=eq.' + numericSchoolId
+                    },
+                    function () {
+                        fetchAllData();
+                    }
+                )
+                .subscribe();
+        }
+
+        /* =====================================================
+           LEAVE APPLICATION & LOGOUT
+        ===================================================== */
+        async function submitLeaveApplication() {
+            const start = document.getElementById('leaveStart').value;
+            const end = document.getElementById('leaveEnd').value;
+            const type = document.getElementById('leaveType').value;
+            const reason = document.getElementById('leaveReason').value;
+
+            if (!start || !end) {
+                alert("Please select both a start and end date.");
+                return;
+            }
+
+            const leaveRequest = {
+                teacherName: currentStaffName,
+                startDate: start,
+                endDate: end,
+                leaveType: type,
+                reason: reason,
+                status: 'Pending',
+                submittedAt: new Date().toISOString()
+            };
+
+            try {
+                let query = dbClient.from('exam_db').select('id, json_payload').eq('data_key', 'leave_requests');
+                const numericSchoolId = parseInt(schoolId, 10) || 1;
+                query = query.eq('school_id', numericSchoolId);
+                
+                const { data: existingData } = await query.limit(1);
+
+                let currentRequests = [];
+                let recordId = null;
+
+                if (existingData && existingData.length > 0) {
+                    let payload = existingData[0].json_payload;
+                    if (typeof payload === 'string') {
+                        try { payload = JSON.parse(payload); } catch(e) {}
+                    }
+                    currentRequests = Array.isArray(payload) ? payload : [];
+                    recordId = existingData[0].id;
+                }
+
+                currentRequests.push(leaveRequest);
+
+                if (recordId) {
+                    await dbClient.from('exam_db').update({ json_payload: currentRequests }).eq('id', recordId);
+                } else {
+                    const payloadObj = { data_key: 'leave_requests', json_payload: currentRequests, school_id: numericSchoolId };
+                    await dbClient.from('exam_db').insert(payloadObj);
+                }
+
+                alert("Leave application submitted successfully to the Administrator.");
+                document.getElementById('leaveStart').value = '';
+                document.getElementById('leaveEnd').value = '';
+                document.getElementById('leaveReason').value = '';
+
+            } catch (error) {
+                console.error("Error submitting leave:", error);
+                alert("Failed to submit application. Please check your network connection.");
+            }
+        }
+
+        function customLogout() {
+            sessionStorage.clear();
+            localStorage.clear();
+            window.location.href = 'index.html';
+        }
+    </script>
+</body>
+</html>
