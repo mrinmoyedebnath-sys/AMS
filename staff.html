@@ -1,0 +1,1006 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Staff Portal - Patkabari High School</title>
+    
+    <!-- LIBRARIES -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+
+    <style>
+        .hidden { display: none !important; }
+        
+        /* Loading Overlay */
+        #loading-overlay { position: fixed; inset: 0; background: #f8fafc; z-index: 9999999; display: flex; justify-content: center; align-items: center; flex-direction: column; transition: opacity 0.4s ease; }
+        .logo-spinner-container { position:relative; width:80px; height:80px; margin:0 auto 15px auto; display:flex; justify-content:center; align-items:center; }
+        .logo-spinner { position:absolute; width:100%; height:100%; border:4px solid #e2e8f0; border-top:4px solid #3b82f6; border-radius:50%; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        /* Custom Scrollbar */
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+        @media print {
+            .no-print { display: none !important; }
+            body { background: white; }
+            .print-full-width { grid-column: span 3 / span 3 !important; border: none !important; box-shadow: none !important; }
+            table { width: 100% !important; border-collapse: collapse; }
+            th, td { border: 1px solid #000 !important; color: #000 !important; }
+        }
+
+        #substitutionTicker { position: relative; }
+        #substitutionTickerTrack { display: inline-block; min-width: 100%; padding-left: 100%; animation: substitutionScroll 25s linear infinite; }
+        #substitutionTickerTrack:hover { animation-play-state: paused; }
+        @keyframes substitutionScroll {
+            0% { transform: translateX(0); }
+            100% { transform: translateX(-100%); }
+        }
+    </style>
+</head>
+<body class="bg-slate-50 h-screen flex flex-col overflow-hidden font-sans text-slate-800 text-xs md:text-sm">
+
+    <!-- LOADING OVERLAY -->
+    <div id="loading-overlay">
+        <div class="logo-spinner-container">
+            <div class="logo-spinner"></div>
+            <i class="fas fa-chalkboard-teacher text-2xl text-blue-600 z-10"></i>
+        </div>
+        <h2 class="text-blue-700 font-black text-sm tracking-wide">Syncing Staff Data...</h2>
+        <p class="text-[10px] text-slate-500 font-bold mt-1">Fetching Routine, Leaves & Notices</p>
+    </div>
+
+    <!-- TOP NAVIGATION HEADER -->
+    <div class="bg-blue-800 text-white shadow-md p-3 flex flex-wrap justify-between items-center shrink-0 border-b-4 border-blue-500 no-print gap-2">
+        <div class="flex items-center gap-2 md:gap-3">
+            <div class="bg-white p-2 rounded-full shadow-inner hidden sm:block">
+                <i class="fas fa-user-tie text-blue-800 text-base"></i>
+            </div>
+            <div>
+                <h1 class="text-sm md:text-lg font-black tracking-tight truncate max-w-[180px] md:max-w-none" id="teacherDashWelcomeTitle">Welcome, Staff</h1>
+                <p class="text-[9px] md:text-[10px] text-blue-200 font-bold uppercase tracking-wider">Patkabari High School</p>
+            </div>
+        </div>
+        <div class="flex items-center gap-1.5 ml-auto">
+            <button onclick="debugFetchExamDB()" class="bg-purple-600 hover:bg-purple-500 text-white px-2 py-1.5 rounded shadow text-[10px] md:text-xs font-black transition-colors flex items-center">
+                <i class="fas fa-database md:mr-1"></i> <span class="hidden md:inline">View DB</span>
+            </button>
+            <button onclick="window.print()" class="bg-blue-600 hover:bg-blue-500 text-white px-2 py-1.5 rounded shadow text-[10px] md:text-xs font-bold transition-colors hidden sm:flex items-center">
+                <i class="fas fa-print md:mr-1"></i> <span class="hidden md:inline">Print</span>
+            </button>
+            <button onclick="customLogout()" class="bg-red-600 hover:bg-red-500 text-white px-2 py-1.5 rounded shadow text-[10px] md:text-xs font-black transition-colors flex items-center">
+                <i class="fas fa-sign-out-alt md:mr-1"></i> <span class="hidden md:inline">Logout</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- MAIN DASHBOARD CONTENT -->
+    <div class="p-2 md:p-6 max-w-7xl mx-auto w-full flex-1 flex flex-col gap-3 md:gap-4 overflow-y-auto">
+        
+        <!-- METRICS ROW -->
+        <div class="grid grid-cols-3 gap-2 md:gap-4 shrink-0 no-print">
+            <div class="bg-white p-2 md:p-3 rounded-lg shadow-sm border border-slate-200 flex flex-col sm:flex-row items-center sm:justify-between border-l-4 border-l-blue-500 text-center sm:text-left">
+                <div>
+                    <h3 class="text-[9px] md:text-xs font-bold text-slate-500 uppercase mb-0.5 whitespace-nowrap">Selected Day Classes</h3>
+                    <p class="text-base md:text-2xl font-black text-blue-700" id="metricTotalClasses">0</p>
+                </div>
+                <i class="fas fa-chalkboard text-lg md:text-3xl text-blue-50 hidden sm:block"></i>
+            </div>
+            
+            <div class="bg-white p-2 md:p-3 rounded-lg shadow-sm border border-slate-200 flex flex-col sm:flex-row items-center sm:justify-between border-l-4 border-l-amber-500 text-center sm:text-left">
+                <div>
+                    <h3 class="text-[9px] md:text-xs font-bold text-slate-500 uppercase mb-0.5 whitespace-nowrap">Today's Proxy</h3>
+                    <p class="text-base md:text-2xl font-black text-amber-600" id="metricProvisional">0</p>
+                </div>
+                <i class="fas fa-clipboard-list text-lg md:text-3xl text-amber-50 hidden sm:block"></i>
+            </div>
+
+            <div class="bg-white p-2 md:p-3 rounded-lg shadow-sm border border-slate-200 flex flex-col sm:flex-row items-center sm:justify-between border-l-4 border-l-emerald-500 text-center sm:text-left">
+                <div>
+                    <h3 class="text-[9px] md:text-xs font-bold text-slate-500 uppercase mb-0.5 whitespace-nowrap">Leave Balance</h3>
+                    <p class="text-[10px] md:text-base font-black text-emerald-600 mt-1 whitespace-nowrap">
+                        CL:<span id="clBalanceDisplay">14</span> <span class="text-slate-300">|</span> ML:<span id="mlBalanceDisplay">15</span>
+                    </p>
+                </div>
+                <i class="fas fa-calendar-check text-lg md:text-3xl text-emerald-50 hidden sm:block"></i>
+            </div>
+        </div>
+
+        <!-- TICKER BAR -->
+        <div id="substitutionTicker" class="w-full bg-amber-50 border-y border-amber-300 overflow-hidden rounded shadow-sm no-print shrink-0">
+            <div id="substitutionTickerTrack" class="whitespace-nowrap py-1.5 text-xs font-bold text-amber-900">
+                Loading substitution duties...
+            </div>
+        </div>
+
+        <!-- TWO COLUMN LAYOUT -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 flex-1 min-h-0">
+            
+            <!-- LEFT/MAIN COLUMN: MASTER ROUTINE & PROVISIONAL TABLE -->
+            <div class="flex flex-col gap-4 lg:col-span-2 print-full-width">
+                
+                <!-- MASTER ROUTINE (DYNAMIC DAY) -->
+                <div class="bg-white rounded-lg shadow-sm border border-slate-200 flex flex-col overflow-hidden shrink-0">
+                    <div class="bg-slate-100 p-2 md:p-3 border-b border-slate-200 flex justify-between items-center shrink-0 flex-wrap gap-2">
+                        <h3 class="font-bold text-slate-800 text-[11px] md:text-sm uppercase tracking-wide flex items-center">
+                            <i class="fas fa-calendar-day text-blue-600 mr-1.5"></i>My Routine 
+                        </h3>
+                        <div class="flex items-center gap-2">
+                            <select id="routineDaySelect" onchange="renderSelectedRoutine()" class="text-[10px] md:text-xs border border-blue-300 rounded p-1 outline-none font-bold text-blue-800 bg-blue-50 shadow-sm">
+                                <option value="Monday">Monday</option>
+                                <option value="Tuesday">Tuesday</option>
+                                <option value="Wednesday">Wednesday</option>
+                                <option value="Thursday">Thursday</option>
+                                <option value="Friday">Friday</option>
+                                <option value="Saturday">Saturday</option>
+                            </select>
+                            <span class="text-[8px] md:text-[9px] font-bold text-white bg-green-600 px-2 py-0.5 rounded-full shadow-sm hidden sm:inline-block">Synced</span>
+                        </div>
+                    </div>
+                    
+                    <div class="overflow-x-auto p-1.5">
+                        <table class="w-full border-collapse text-[10px] md:text-xs text-center min-w-[500px]">
+                            <thead>
+                                <tr class="bg-slate-50 text-slate-700 border-b-2 border-slate-300">
+                                    <th class="p-1.5 md:p-2 border-r font-black uppercase text-left w-16 md:w-20">Day</th>
+                                    <th class="p-1.5 md:p-2 border-r font-bold">1st</th>
+                                    <th class="p-1.5 md:p-2 border-r font-bold">2nd</th>
+                                    <th class="p-1.5 md:p-2 border-r font-bold">3rd</th>
+                                    <th class="p-1.5 md:p-2 border-r font-bold">4th</th>
+                                    <th class="p-1.5 md:p-2 border-r font-bold">5th</th>
+                                    <th class="p-1.5 md:p-2 border-r font-bold">6th</th>
+                                    <th class="p-1.5 md:p-2 border-r font-bold">7th</th>
+                                    <th class="p-1.5 md:p-2 font-bold">8th</th>
+                                </tr>
+                            </thead>
+                            <tbody id="teacherDashRoutineBody">
+                                <!-- Populated by JavaScript -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- PROVISIONAL CLASSES TABLE -->
+                <div class="bg-white rounded-lg shadow-sm border border-slate-200 flex flex-col overflow-hidden border-t-4 border-amber-400">
+                    <div class="bg-amber-50 p-2 md:p-3 border-b border-amber-200 flex justify-between items-center shrink-0">
+                        <h3 class="font-bold text-amber-900 text-[11px] md:text-sm uppercase tracking-wide truncate">
+                            <i class="fas fa-clipboard-user text-amber-600 mr-1.5"></i>Today's Proxy Classes
+                        </h3>
+                        <div class="flex items-center gap-1.5 shrink-0">
+                            <span class="text-[8px] md:text-[9px] font-bold text-amber-800 bg-amber-200 px-2 py-0.5 rounded-full shadow-sm" id="provisionalCountBadge">0 Assigned</span>
+                            <button onclick="openExtraClassModal()" class="text-[9px] md:text-[10px] font-bold text-white bg-blue-600 hover:bg-blue-500 px-2 py-1 rounded shadow-sm transition-colors flex items-center">
+                                <i class="fas fa-history mr-1"></i> History
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="overflow-x-auto p-1.5">
+                        <table class="w-full border-collapse text-[10px] md:text-xs text-center min-w-[400px]">
+                            <thead>
+                                <tr class="bg-amber-100/70 text-amber-950 border-b-2 border-amber-300">
+                                    <th class="p-1.5 md:p-2 border-r border-amber-200 font-black uppercase tracking-wider">Period</th>
+                                    <th class="p-1.5 md:p-2 border-r border-amber-200 font-black uppercase tracking-wider">Class</th>
+                                    <th class="p-1.5 md:p-2 border-r border-amber-200 font-black uppercase tracking-wider">Subject</th>
+                                    <th class="p-1.5 md:p-2 font-black uppercase tracking-wider">Covering For</th>
+                                </tr>
+                            </thead>
+                            <tbody id="provisionalTableBody">
+                                <tr>
+                                    <td colspan="4" class="p-4 text-slate-400 font-semibold italic text-[10px] md:text-xs">No provisional duties assigned for today.</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- RIGHT COLUMN: ALERTS, NOTICES & FORMS -->
+            <div class="flex flex-col gap-4 no-print shrink-0 pb-6">
+                
+                <!-- NOTICE BOARD -->
+                <div class="bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden shrink-0">
+                    <div class="bg-indigo-50 p-2 md:p-3 border-b border-indigo-200 shrink-0 flex items-center">
+                        <i class="fas fa-bullhorn text-indigo-600 mr-1.5"></i>
+                        <h3 class="font-bold text-indigo-900 text-[11px] md:text-sm uppercase">Notice Board</h3>
+                    </div>
+                    <div class="p-2 md:p-3 max-h-48 overflow-y-auto no-scrollbar flex flex-col gap-2" id="noticeBoardContainer">
+                        <p class="text-[10px] md:text-xs text-slate-500 font-semibold italic text-center py-2">Loading notices...</p>
+                    </div>
+                </div>
+
+                <!-- PROVISIONAL NOTICES ALERTS (MOBILE LIST VIEW) -->
+                <div class="bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden">
+                    <div class="bg-amber-50 p-2 md:p-3 border-b border-amber-200 shrink-0 flex items-center">
+                        <i class="fas fa-bell text-amber-600 mr-1.5 animate-pulse"></i>
+                        <h3 class="font-bold text-amber-900 text-[11px] md:text-sm uppercase">Proxy Alerts</h3>
+                    </div>
+                    <div class="p-2 md:p-3 text-center flex flex-col gap-2" id="provisionalContainer">
+                        <div class="py-3">
+                            <i class="fas fa-check-circle text-2xl md:text-3xl text-slate-200 mb-2"></i>
+                            <p class="text-[10px] md:text-xs text-slate-500 font-bold">No proxy duties assigned for today.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- LEAVE APPLICATION -->
+                <div class="bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden shrink-0">
+                    <div class="bg-slate-50 p-2 md:p-3 border-b border-slate-200 shrink-0 flex justify-between items-center">
+                        <h3 class="font-bold text-slate-700 text-[11px] md:text-sm uppercase">
+                            <i class="fas fa-envelope-open-text text-blue-600 mr-1.5"></i>Apply for Leave
+                        </h3>
+                    </div>
+                    <div class="p-3 md:p-4 flex flex-col gap-3">
+                        <div class="grid grid-cols-2 gap-2">
+                            <div>
+                                <label class="text-[9px] md:text-[10px] font-bold text-slate-600 block mb-1">Start Date</label>
+                                <input type="date" id="leaveStart" class="w-full border border-slate-300 p-1.5 rounded text-[10px] md:text-xs outline-none focus:border-blue-500 bg-slate-50">
+                            </div>
+                            <div>
+                                <label class="text-[9px] md:text-[10px] font-bold text-slate-600 block mb-1">End Date</label>
+                                <input type="date" id="leaveEnd" class="w-full border border-slate-300 p-1.5 rounded text-[10px] md:text-xs outline-none focus:border-blue-500 bg-slate-50">
+                            </div>
+                        </div>
+                        <div>
+                            <label class="text-[9px] md:text-[10px] font-bold text-slate-600 block mb-1">Leave Type</label>
+                            <select id="leaveType" class="w-full border border-slate-300 p-1.5 rounded text-[10px] md:text-xs outline-none focus:border-blue-500 bg-slate-50 font-semibold text-slate-700">
+                                <option value="CL">Casual Leave (CL)</option>
+                                <option value="ML">Medical Leave (ML)</option>
+                                <option value="OD">On Duty (OD)</option>
+                                <option value="CCL">Child Care Leave (CCL)</option>
+                                <option value="HALFPAY">Half Pay Leave</option>
+                                <option value="Commuted">Commuted Leave</option>
+                                <option value="OTHER">Other / Miscellaneous</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="text-[9px] md:text-[10px] font-bold text-slate-600 block mb-1">Reason (Optional)</label>
+                            <textarea id="leaveReason" rows="2" class="w-full border border-slate-300 p-1.5 rounded text-[10px] md:text-xs outline-none focus:border-blue-500 bg-slate-50 resize-none text-slate-700" placeholder="Brief reason..."></textarea>
+                        </div>
+                        
+                        <div class="flex flex-col gap-2 mt-1">
+                            <button onclick="submitLeaveApplication()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 rounded shadow transition-colors text-[10px] md:text-xs">
+                                Submit Application
+                            </button>
+                            <button onclick="openLeaveRegisterModal()" class="w-full bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold py-1.5 rounded border border-slate-300 transition-colors text-[10px] md:text-xs">
+                                <i class="fas fa-list-alt mr-1"></i> View Leave Register
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL OVERLAY FOR PROXY HISTORY -->
+    <div id="extraClassModal" class="fixed inset-0 bg-slate-900/60 z-[999999] hidden flex justify-center items-center p-2 md:p-3 backdrop-blur-sm transition-opacity duration-300">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-3xl flex flex-col max-h-[85vh] overflow-hidden border border-slate-200">
+            <div class="px-3 py-2.5 md:px-4 md:py-3 border-b border-slate-200 flex flex-col md:flex-row justify-between items-start md:items-center bg-blue-50 shrink-0 gap-2">
+                <div class="flex justify-between w-full md:w-auto items-center">
+                    <h2 class="text-[11px] md:text-base font-black text-blue-900 flex items-center truncate">
+                        <i class="fas fa-list-ul text-blue-600 mr-2"></i> Proxy History
+                    </h2>
+                    <button onclick="closeExtraClassModal()" class="md:hidden text-blue-400 hover:text-red-600 bg-white rounded-full p-1.5 w-7 h-7 flex items-center justify-center shadow-sm transition-colors focus:outline-none">
+                        <i class="fas fa-times text-xs"></i>
+                    </button>
+                </div>
+                <!-- Date Filter for Proxy -->
+                <div class="flex flex-wrap items-center gap-1.5">
+                    <input type="date" id="proxyFilterStart" class="text-[10px] p-1 border border-blue-300 rounded outline-none text-slate-700">
+                    <span class="text-[10px] font-bold text-blue-900">to</span>
+                    <input type="date" id="proxyFilterEnd" class="text-[10px] p-1 border border-blue-300 rounded outline-none text-slate-700">
+                    <button onclick="openExtraClassModal()" class="bg-blue-600 text-white px-2 py-1 rounded text-[10px] font-bold shadow hover:bg-blue-700 transition-colors">Filter</button>
+                    <button onclick="closeExtraClassModal()" class="hidden md:flex text-blue-400 hover:text-red-600 bg-white rounded-full p-1.5 w-7 h-7 items-center justify-center shadow-sm transition-colors focus:outline-none ml-2">
+                        <i class="fas fa-times text-sm"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="p-2 md:p-4 overflow-y-auto flex-1 bg-slate-50 no-scrollbar">
+                <div class="bg-white rounded-lg border border-slate-200 shadow-sm overflow-x-auto">
+                    <table class="w-full border-collapse text-[10px] md:text-xs text-center min-w-[500px]">
+                        <thead>
+                            <tr class="bg-slate-100 text-slate-700 border-b-2 border-slate-300">
+                                <th class="p-2 border-r font-black uppercase tracking-wider">Date</th>
+                                <th class="p-2 border-r font-black uppercase tracking-wider">Role</th>
+                                <th class="p-2 border-r font-black uppercase tracking-wider">Period</th>
+                                <th class="p-2 border-r font-black uppercase tracking-wider">Class</th>
+                                <th class="p-2 border-r font-black uppercase tracking-wider">Subject</th>
+                                <th class="p-2 font-black uppercase tracking-wider text-red-700">Counterpart</th>
+                            </tr>
+                        </thead>
+                        <tbody id="extraClassModalBody">
+                            <tr><td colspan="6" class="p-4 text-slate-400 font-semibold italic text-[10px] md:text-xs">Loading records...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL OVERLAY FOR LEAVE REGISTER -->
+    <div id="leaveRegisterModal" class="fixed inset-0 bg-slate-900/60 z-[999999] hidden flex justify-center items-center p-2 md:p-3 backdrop-blur-sm transition-opacity duration-300">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-4xl flex flex-col max-h-[85vh] overflow-hidden border border-slate-200">
+            <div class="px-3 py-2.5 md:px-4 md:py-3 border-b border-slate-200 flex flex-col md:flex-row justify-between items-start md:items-center bg-emerald-50 shrink-0 gap-2">
+                <div class="flex justify-between w-full md:w-auto items-center">
+                    <h2 class="text-[11px] md:text-base font-black text-emerald-900 flex items-center truncate">
+                        <i class="fas fa-calendar-check text-emerald-600 mr-2"></i> Leave Register
+                    </h2>
+                    <button onclick="closeLeaveRegisterModal()" class="md:hidden text-emerald-400 hover:text-red-600 bg-white rounded-full p-1.5 w-7 h-7 flex items-center justify-center shadow-sm transition-colors focus:outline-none">
+                        <i class="fas fa-times text-xs"></i>
+                    </button>
+                </div>
+                <!-- Date Filter for Leave Register -->
+                <div class="flex flex-wrap items-center gap-1.5">
+                    <input type="date" id="leaveFilterStart" class="text-[10px] p-1 border border-emerald-300 rounded outline-none text-slate-700">
+                    <span class="text-[10px] font-bold text-emerald-900">to</span>
+                    <input type="date" id="leaveFilterEnd" class="text-[10px] p-1 border border-emerald-300 rounded outline-none text-slate-700">
+                    <button onclick="openLeaveRegisterModal()" class="bg-emerald-600 text-white px-2 py-1 rounded text-[10px] font-bold shadow hover:bg-emerald-700 transition-colors">Filter</button>
+                    <button onclick="closeLeaveRegisterModal()" class="hidden md:flex text-emerald-400 hover:text-red-600 bg-white rounded-full p-1.5 w-7 h-7 items-center justify-center shadow-sm transition-colors focus:outline-none ml-2">
+                        <i class="fas fa-times text-sm"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="p-2 md:p-4 overflow-y-auto flex-1 bg-slate-50 no-scrollbar">
+                <div class="bg-white rounded-lg border border-slate-200 shadow-sm overflow-x-auto">
+                    <table class="w-full border-collapse text-[10px] md:text-xs text-center min-w-[500px]">
+                        <thead>
+                            <tr class="bg-slate-100 text-slate-700 border-b-2 border-slate-300">
+                                <th class="p-2 border-r font-black uppercase tracking-wider">Submitted</th>
+                                <th class="p-2 border-r font-black uppercase tracking-wider">Type</th>
+                                <th class="p-2 border-r font-black uppercase tracking-wider">Duration</th>
+                                <th class="p-2 border-r font-black uppercase tracking-wider">Days</th>
+                                <th class="p-2 border-r font-black uppercase tracking-wider">Reason</th>
+                                <th class="p-2 font-black uppercase tracking-wider">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="leaveRegisterModalBody">
+                            <tr><td colspan="6" class="p-4 text-slate-400 font-semibold italic text-[10px] md:text-xs">Loading leave history...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- DB DEBUG MODAL -->
+    <div id="debugModal" class="fixed inset-0 bg-slate-900/80 z-[9999999] hidden flex justify-center items-center p-3 backdrop-blur-sm">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-4xl flex flex-col h-[85vh] overflow-hidden border border-slate-200">
+            <div class="px-4 py-3 border-b border-slate-200 flex justify-between items-center bg-purple-50 shrink-0">
+                <h2 class="text-sm md:text-base font-black text-purple-900 truncate"><i class="fas fa-database mr-1.5"></i> exam_db Contents</h2>
+                <button onclick="document.getElementById('debugModal').classList.add('hidden')" class="text-purple-400 hover:text-red-600 focus:outline-none">
+                    <i class="fas fa-times text-lg"></i>
+                </button>
+            </div>
+            <div class="p-3 overflow-y-auto flex-1 bg-slate-800 text-green-400 font-mono text-[10px] md:text-xs text-left">
+                <pre id="debugOutput">Loading...</pre>
+            </div>
+        </div>
+    </div>
+
+    <!-- CONFIG & LOGIC -->
+    <script src="supabase-config.js"></script>
+
+    <script>
+        const PERIODS = ["1st", "2nd", "3rd", "4th", "5th", "6th", "7th", "8th"];
+        
+        let currentStaffName = '';
+        let schoolId = '';
+        
+        // Caches for features
+        let cachedRoutineData = [];
+        let myAllExtraClasses = []; 
+        let myLeaveRequests = []; 
+        let schoolNotices = [];
+        
+        const dbClient = typeof supabaseClient !== 'undefined' ? supabaseClient : window.supabase;
+
+        window.addEventListener('DOMContentLoaded', async () => {
+            const role = sessionStorage.getItem('userRole') || localStorage.getItem('userRole');
+            currentStaffName = sessionStorage.getItem('loggedInUser') || localStorage.getItem('loggedInUser');
+            schoolId = sessionStorage.getItem('schoolId') || localStorage.getItem('schoolId') || '1';
+
+            if (role !== 'teacher' || !currentStaffName) {
+                window.location.href = 'index.html'; 
+                return;
+            }
+
+            document.getElementById('teacherDashWelcomeTitle').innerText = currentStaffName;
+
+            // Initialize Day Dropdown
+            const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+            let currentDayName = dayNames[new Date().getDay()];
+            if(currentDayName === "Sunday") currentDayName = "Monday"; // Default to Monday if Sunday
+            document.getElementById('routineDaySelect').value = currentDayName;
+
+            await fetchAllData(); 
+            await initializeSubstitutionSync();
+
+            document.getElementById('loading-overlay').classList.add('hidden');
+        });
+
+        function sanitizeName(name) {
+            return String(name || '').replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+        }
+
+        /* =====================================================
+           UNIFIED DATA FETCH (ROUTINE + SUBSTITUTION + LEAVES + NOTICES)
+        ===================================================== */
+        async function fetchAllData() {
+            try {
+                if (!dbClient) throw new Error("Database client not found. Check supabase-config.js");
+
+                const numericSchoolId = parseInt(schoolId, 10) || 1;
+
+                const { data, error } = await dbClient
+                    .from('exam_db')
+                    .select('id, school_id, data_key, json_payload')
+                    .eq('school_id', numericSchoolId);
+
+                if (error) throw error;
+
+                cachedRoutineData = [];
+                let allAssignments = [];
+                const staffNameClean = sanitizeName(currentStaffName);
+                
+                myLeaveRequests = []; 
+                schoolNotices = [];
+
+                if (data && data.length > 0) {
+                    data.forEach(row => {
+                        let payload = row.json_payload;
+                        if (typeof payload === 'string') {
+                            try { payload = JSON.parse(payload); } catch(e) {}
+                        }
+                        if (!payload) return;
+
+                        const key = String(row.data_key).toLowerCase().trim();
+
+                        // 1. Fetch Routine
+                        if (key.includes('routine')) {
+                            if (Array.isArray(payload)) cachedRoutineData = cachedRoutineData.concat(payload);
+                            else if (payload.routineData && Array.isArray(payload.routineData)) cachedRoutineData = cachedRoutineData.concat(payload.routineData);
+                            else if (payload.data && Array.isArray(payload.data)) cachedRoutineData = cachedRoutineData.concat(payload.data);
+                        }
+
+                        // 2. Fetch Substitutions
+                        if (key.includes('substitution') || key.includes('proxy') || key.includes('provisional')) {
+                            if (Array.isArray(payload)) {
+                                payload.forEach(item => {
+                                    if (Array.isArray(item)) {
+                                        allAssignments.push({
+                                            date: String(item[0] || '').trim(),
+                                            period: String(item[2] || '').trim(),
+                                            class: String(item[3] || '').trim(),
+                                            subject: String(item[4] || '').trim(),
+                                            absentTeacher: String(item[5] || '').trim(),
+                                            substituteTeacher: String(item[6] || '').trim()
+                                        });
+                                    } else if (typeof item === 'object' && item !== null) {
+                                        allAssignments.push({
+                                            date: String(item.date || item[0] || '').trim(),
+                                            period: String(item.period || item[2] || '').trim(),
+                                            class: String(item.class || item[3] || '').trim(),
+                                            subject: String(item.subject || item[4] || '').trim(),
+                                            absentTeacher: String(item.absentTeacher || item.originalTeacher || item[5] || '').trim(),
+                                            substituteTeacher: String(item.substituteTeacher || item.proxyTeacher || item[6] || '').trim()
+                                        });
+                                    }
+                                });
+                            }
+                        }
+
+                        // 3. Fetch Leaves
+                        if (key === 'leave_requests') {
+                            if (Array.isArray(payload)) {
+                                myLeaveRequests = payload.filter(req => sanitizeName(req.teacherName) === staffNameClean);
+                            }
+                        }
+
+                        // 4. Fetch Notices
+                        if (key === 'notices') {
+                            if (Array.isArray(payload)) schoolNotices = payload;
+                        }
+                    });
+                }
+
+                // Render all modules
+                renderSelectedRoutine();
+                calculateAndRenderLeaveBalances();
+                renderNoticeBoard();
+
+                myAllExtraClasses = allAssignments.filter(duty => {
+                    const subClean = sanitizeName(duty.substituteTeacher);
+                    const absClean = sanitizeName(duty.absentTeacher);
+                    return subClean === staffNameClean || absClean === staffNameClean;
+                });
+                
+                myAllExtraClasses.sort((a, b) => new Date(b.date) - new Date(a.date)); // Newest first
+
+                const today = new Date();
+                const todayISO = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+
+                const todayAssignments = myAllExtraClasses.filter(duty => {
+                    const dutyDate = String(duty.date || '').trim();
+                    const isToday = (dutyDate === todayISO);
+                    const isSubstitute = sanitizeName(duty.substituteTeacher) === staffNameClean;
+                    return isToday && isSubstitute;
+                });
+
+                renderSubstitutionTicker(todayAssignments);
+                renderProvisionalDuties(todayAssignments);
+
+            } catch (err) {
+                console.error("Error fetching dashboard data:", err);
+                renderSubstitutionTicker([], true);
+            }
+        }
+
+        /* =====================================================
+           DYNAMIC DAY ROUTINE RENDERING
+        ===================================================== */
+        function renderSelectedRoutine() {
+            const selectedDay = document.getElementById('routineDaySelect').value;
+            const tbody = document.getElementById('teacherDashRoutineBody');
+            tbody.innerHTML = '';
+            
+            const staffNameClean = sanitizeName(currentStaffName);
+            let dayClassesCount = 0;
+            let rowHtml = `<tr class="border-b border-slate-200 hover:bg-white transition-colors">
+                            <td class="p-1.5 md:p-3 font-black text-slate-700 bg-slate-50 border-r border-slate-200 text-left whitespace-nowrap">${selectedDay}</td>`;
+            
+            PERIODS.forEach(period => {
+                const match = cachedRoutineData.find(r => {
+                    if (!r) return false;
+                    const rTeacher = r[5] || r.teacher || r.Teacher || '';
+                    const rDay = r[0] || r.day || r.Day || '';
+                    const rPeriod = r[1] || r.period || r.Period || '';
+                    const cleanRTeacher = sanitizeName(rTeacher);
+                    
+                    return cleanRTeacher === staffNameClean && 
+                           String(rDay).trim().toLowerCase() === selectedDay.toLowerCase() && 
+                           String(rPeriod).trim().toLowerCase() === period.toLowerCase();
+                });
+                
+                if (match) {
+                    dayClassesCount++;
+                    const className = match[2] || match.class || match.Class || 'N/A';
+                    const subjectName = match[4] || match.subject || match.Subject || 'N/A';
+                    
+                    rowHtml += `
+                        <td class="p-1 md:p-2 border-r border-slate-200 align-middle">
+                            <div class="bg-blue-50 border border-blue-200 rounded p-1 shadow-sm h-full flex flex-col justify-center items-center text-center">
+                                <span class="font-black text-red-600 text-[10px] md:text-xs block leading-tight">Cl-${className}</span>
+                                <span class="font-bold text-blue-800 text-[8px] md:text-[9px] uppercase block truncate w-full" title="${subjectName}">${subjectName}</span>
+                            </div>
+                        </td>`;
+                } else {
+                    rowHtml += `<td class="p-1 md:p-2 border-r border-slate-200 align-middle text-slate-300 font-bold">-</td>`;
+                }
+            });
+            
+            rowHtml += `</tr>`;
+            tbody.innerHTML = rowHtml;
+            document.getElementById('metricTotalClasses').innerText = dayClassesCount;
+        }
+
+        /* =====================================================
+           NOTICE BOARD RENDERING
+        ===================================================== */
+        function renderNoticeBoard() {
+            const container = document.getElementById('noticeBoardContainer');
+            container.innerHTML = '';
+            
+            if (!schoolNotices || schoolNotices.length === 0) {
+                container.innerHTML = `<p class="text-[10px] md:text-xs text-slate-500 font-semibold italic text-center py-4">No recent notices published.</p>`;
+                return;
+            }
+
+            // Sort newest first
+            const sortedNotices = [...schoolNotices].sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
+            
+            sortedNotices.forEach(notice => {
+                const noticeDate = notice.date ? new Date(notice.date).toLocaleDateString() : '';
+                container.innerHTML += `
+                    <div class="bg-white border border-indigo-100 rounded p-2 shadow-sm hover:border-indigo-300 transition-colors">
+                        <div class="flex justify-between items-start mb-1">
+                            <h4 class="font-black text-indigo-900 text-[10px] md:text-xs leading-tight">${notice.title || 'Notice'}</h4>
+                            <span class="text-[8px] font-bold text-slate-400 whitespace-nowrap ml-2">${noticeDate}</span>
+                        </div>
+                        <p class="text-[9px] md:text-[10px] text-slate-600 font-semibold leading-relaxed">${notice.content || ''}</p>
+                    </div>
+                `;
+            });
+        }
+
+        /* =====================================================
+           LEAVE BALANCES & REGISTER MODAL (WITH DATE FILTER)
+        ===================================================== */
+        function calculateAndRenderLeaveBalances() {
+            let clTaken = 0;
+            let mlTaken = 0;
+            const defaultClQuota = 14;
+            const defaultMlQuota = 15;
+
+            myLeaveRequests.forEach(req => {
+                if (req.status === 'Approved') {
+                    const start = new Date(req.startDate);
+                    const end = new Date(req.endDate);
+                    const days = Math.round((end - start) / (1000 * 60 * 60 * 24)) + 1;
+                    
+                    if (req.leaveType.includes('CL')) clTaken += days;
+                    if (req.leaveType.includes('ML')) mlTaken += days;
+                }
+            });
+
+            document.getElementById('clBalanceDisplay').innerText = (defaultClQuota - clTaken);
+            document.getElementById('mlBalanceDisplay').innerText = (defaultMlQuota - mlTaken);
+        }
+
+        function openLeaveRegisterModal() {
+            const modal = document.getElementById('leaveRegisterModal');
+            const tbody = document.getElementById('leaveRegisterModalBody');
+            
+            const startDateStr = document.getElementById('leaveFilterStart').value;
+            const endDateStr = document.getElementById('leaveFilterEnd').value;
+            
+            tbody.innerHTML = '';
+
+            let filteredLeaves = [...myLeaveRequests];
+
+            // Apply Date Filter if provided
+            if (startDateStr && endDateStr) {
+                const filterStart = new Date(startDateStr);
+                const filterEnd = new Date(endDateStr);
+                filteredLeaves = filteredLeaves.filter(req => {
+                    const reqStart = new Date(req.startDate);
+                    return (reqStart >= filterStart && reqStart <= filterEnd);
+                });
+            }
+
+            if (filteredLeaves.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="6" class="p-6 text-slate-400 font-semibold italic text-[10px] md:text-xs">No leave records found for the selected dates.</td></tr>`;
+            } else {
+                let html = '';
+                // Sort newest submissions first
+                filteredLeaves.sort((a, b) => new Date(b.submittedAt || 0) - new Date(a.submittedAt || 0));
+
+                filteredLeaves.forEach(req => {
+                    const start = new Date(req.startDate);
+                    const end = new Date(req.endDate);
+                    const days = Math.round((end - start) / (1000 * 60 * 60 * 24)) + 1;
+                    const subDate = req.submittedAt ? new Date(req.submittedAt).toLocaleDateString() : 'N/A';
+                    
+                    let statusBadge = '';
+                    if (req.status === 'Approved') statusBadge = '<span class="bg-emerald-100 text-emerald-800 border border-emerald-300 px-1.5 py-0.5 rounded text-[9px] font-black uppercase">Approved</span>';
+                    else if (req.status === 'Rejected') statusBadge = '<span class="bg-red-100 text-red-800 border border-red-300 px-1.5 py-0.5 rounded text-[9px] font-black uppercase">Rejected</span>';
+                    else statusBadge = '<span class="bg-amber-100 text-amber-800 border border-amber-300 px-1.5 py-0.5 rounded text-[9px] font-black uppercase">Pending</span>';
+
+                    html += `
+                        <tr class="border-b border-slate-200 hover:bg-slate-50 transition-colors">
+                            <td class="p-2 text-slate-500 whitespace-nowrap">${subDate}</td>
+                            <td class="p-2 font-bold text-slate-700 whitespace-nowrap">${req.leaveType}</td>
+                            <td class="p-2 text-blue-900 whitespace-nowrap">${req.startDate} to ${req.endDate}</td>
+                            <td class="p-2 font-black">${days}</td>
+                            <td class="p-2 text-slate-500 text-left max-w-[150px] truncate" title="${req.reason || 'None'}">${req.reason || '-'}</td>
+                            <td class="p-2">${statusBadge}</td>
+                        </tr>
+                    `;
+                });
+                tbody.innerHTML = html;
+            }
+            modal.classList.remove('hidden');
+        }
+
+        function closeLeaveRegisterModal() {
+            document.getElementById('leaveRegisterModal').classList.add('hidden');
+        }
+
+        /* =====================================================
+           MODAL LOGIC (EXTRA CLASSES WITH DATE FILTER)
+        ===================================================== */
+        function openExtraClassModal() {
+            const modal = document.getElementById('extraClassModal');
+            const tbody = document.getElementById('extraClassModalBody');
+            
+            const startDateStr = document.getElementById('proxyFilterStart').value;
+            const endDateStr = document.getElementById('proxyFilterEnd').value;
+            
+            tbody.innerHTML = '';
+
+            let filteredClasses = [...myAllExtraClasses];
+
+            if (startDateStr && endDateStr) {
+                const filterStart = new Date(startDateStr);
+                const filterEnd = new Date(endDateStr);
+                filteredClasses = filteredClasses.filter(duty => {
+                    const dutyDate = new Date(duty.date);
+                    return (dutyDate >= filterStart && dutyDate <= filterEnd);
+                });
+            }
+
+            if (filteredClasses.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="6" class="p-6 text-slate-400 font-semibold italic text-[10px] md:text-xs">No extra classes found for the selected dates.</td></tr>`;
+            } else {
+                let html = '';
+                const staffClean = sanitizeName(currentStaffName);
+
+                filteredClasses.forEach(duty => {
+                    let date = duty.date || 'Unknown Date';
+                    let period = duty.period || 'Assigned';
+                    let cls = duty.class || 'N/A';
+                    let subject = duty.subject || '-';
+                    
+                    const subClean = sanitizeName(duty.substituteTeacher);
+                    const absClean = sanitizeName(duty.absentTeacher);
+                    
+                    let roleBadge = '';
+                    let counterpart = '';
+
+                    if (subClean === staffClean) {
+                        roleBadge = '<span class="bg-emerald-100 text-emerald-800 border border-emerald-300 px-1.5 py-0.5 rounded text-[9px] font-black uppercase">Substitute</span>';
+                        counterpart = `Covering for: <b>${duty.absentTeacher}</b>`;
+                    } else if (absClean === staffClean) {
+                        roleBadge = '<span class="bg-red-100 text-red-800 border border-red-300 px-1.5 py-0.5 rounded text-[9px] font-black uppercase">Absent</span>';
+                        counterpart = `Covered by: <b>${duty.substituteTeacher}</b>`;
+                    }
+
+                    const today = new Date();
+                    const todayISO = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+                    const isToday = (date === todayISO);
+                    
+                    const rowClass = isToday ? 'bg-amber-50 hover:bg-amber-100 font-bold border-l-4 border-l-amber-500' : 'hover:bg-slate-50';
+
+                    html += `
+                        <tr class="border-b border-slate-200 transition-colors ${rowClass}">
+                            <td class="p-2 text-slate-700 whitespace-nowrap">${date} ${isToday ? '<span class="ml-1 text-[8px] bg-amber-500 text-white px-1 py-0.5 rounded">Today</span>' : ''}</td>
+                            <td class="p-2">${roleBadge}</td>
+                            <td class="p-2 text-blue-900 font-bold">${period}</td>
+                            <td class="p-2 text-slate-900 font-black whitespace-nowrap">Class ${cls}</td>
+                            <td class="p-2 text-slate-600">${subject}</td>
+                            <td class="p-2 text-slate-600 text-[10px] md:text-xs">${counterpart}</td>
+                        </tr>
+                    `;
+                });
+                tbody.innerHTML = html;
+            }
+            modal.classList.remove('hidden');
+        }
+
+        function closeExtraClassModal() {
+            document.getElementById('extraClassModal').classList.add('hidden');
+        }
+
+        /* =====================================================
+           RENDER TICKER & DASHBOARD WINDOW
+        ===================================================== */
+        function renderSubstitutionTicker(duties, hasError = false) {
+            const track = document.getElementById('substitutionTickerTrack');
+            if (!track) return;
+
+            if (hasError) {
+                track.textContent = '⚠ Unable to synchronize substitution duties.';
+                return;
+            }
+
+            if (!duties || duties.length === 0) {
+                track.textContent = '✓ No provisional classes assigned to you today.';
+                return;
+            }
+
+            const messages = duties.map(duty => {
+                const period = duty.period || 'Assigned';
+                const className = duty.class || 'N/A';
+                const originalTeacher = duty.absentTeacher || 'Unknown';
+                return `🔔 PROXY DUTY | Period: ${period} | Class: ${className} | For: ${originalTeacher}`;
+            });
+
+            track.textContent = messages.join('     ✦     ');
+        }
+
+        function renderProvisionalDuties(provisionalData) {
+            const totalDuties = provisionalData.length;
+            const container = document.getElementById('provisionalContainer');
+            const tableBody = document.getElementById('provisionalTableBody');
+            const countBadge = document.getElementById('provisionalCountBadge');
+            
+            document.getElementById('metricProvisional').innerText = totalDuties;
+            if (countBadge) countBadge.innerText = totalDuties + ' Assigned';
+
+            if (provisionalData.length > 0) {
+                let tableHtml = '';
+                provisionalData.forEach(duty => {
+                    let period = duty.period || 'Assigned';
+                    let cls = duty.class || 'N/A';
+                    let subject = duty.subject || '-';
+                    let absentTeacher = duty.absentTeacher || 'Not specified';
+
+                    tableHtml += `
+                        <tr class="border-b border-amber-100 hover:bg-amber-50/50 transition-colors">
+                            <td class="p-2 font-bold text-amber-900">${period}</td>
+                            <td class="p-2 font-black text-slate-800 whitespace-nowrap">Class ${cls}</td>
+                            <td class="p-2 font-semibold text-slate-600">${subject}</td>
+                            <td class="p-2 font-bold text-red-600">${absentTeacher}</td>
+                        </tr>
+                    `;
+                });
+                tableBody.innerHTML = tableHtml;
+            } else {
+                tableBody.innerHTML = `<tr><td colspan="4" class="p-4 text-slate-400 font-semibold italic text-[10px] md:text-xs">No proxy duties assigned for today.</td></tr>`;
+            }
+
+            if (totalDuties > 0) {
+                let html = `<div class="max-h-48 overflow-y-auto pr-1 flex flex-col gap-2 no-scrollbar"><ul class="text-left flex flex-col gap-2 w-full">`;
+                
+                provisionalData.forEach(duty => {
+                    let period = duty.period || 'Assigned';
+                    let cls = duty.class || 'N/A';
+                    let absentTeacher = duty.absentTeacher || '';
+                    const forText = absentTeacher ? `<span class="block text-[9px] text-amber-800 font-semibold mt-0.5">Covering for: ${absentTeacher}</span>` : '';
+
+                    html += `
+                        <li class="bg-amber-100 border border-amber-300 p-2 rounded flex justify-between items-center shadow-sm shrink-0">
+                            <div>
+                                <span class="font-black text-amber-900 block text-[9px] uppercase tracking-wider mb-0.5">Provisional Class</span>
+                                <span class="text-amber-950 font-black text-xs md:text-sm block leading-tight">Class ${cls}</span>
+                                <span class="text-amber-900 font-bold text-[9px] md:text-[10px] block mt-0.5">${period} Period</span>
+                                ${forText}
+                            </div>
+                            <i class="fas fa-exchange-alt text-amber-600 text-sm md:text-base shadow-sm rounded-full bg-white p-1.5 md:p-2"></i>
+                        </li>
+                    `;
+                });
+
+                html += `</ul></div>`;
+                container.innerHTML = html;
+            } else {
+                container.innerHTML = `
+                    <div class="py-3">
+                        <i class="fas fa-check-circle text-2xl md:text-3xl text-slate-200 mb-2"></i>
+                        <p class="text-[10px] md:text-xs text-slate-500 font-bold">No proxy duties assigned for today.</p>
+                    </div>`;
+            }
+        }
+
+        async function initializeSubstitutionSync() {
+            if (!dbClient) return;
+            const numericSchoolId = parseInt(schoolId, 10) || 1;
+
+            dbClient
+                .channel('substitution-sync-school-' + numericSchoolId)
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'exam_db', filter: 'school_id=eq.' + numericSchoolId },
+                    function () { fetchAllData(); }
+                )
+                .subscribe();
+        }
+
+        /* =====================================================
+           LEAVE APPLICATION & LOGOUT
+        ===================================================== */
+        async function submitLeaveApplication() {
+            const start = document.getElementById('leaveStart').value;
+            const end = document.getElementById('leaveEnd').value;
+            const type = document.getElementById('leaveType').value;
+            const reason = document.getElementById('leaveReason').value;
+
+            if (!start || !end) {
+                alert("Please select both a start and end date.");
+                return;
+            }
+
+            const reqStart = new Date(start);
+            const reqEnd = new Date(end);
+            
+            if (reqEnd < reqStart) {
+                alert("End date cannot be before start date.");
+                return;
+            }
+
+            const hasOverlap = myLeaveRequests.some(req => {
+                if (req.status === 'Rejected') return false; 
+                const existingStart = new Date(req.startDate);
+                const existingEnd = new Date(req.endDate);
+                return (reqStart <= existingEnd && reqEnd >= existingStart);
+            });
+
+            if (hasOverlap) {
+                alert("Duplicate Request Blocked: You already have a pending or approved leave application that overlaps with these dates.");
+                return;
+            }
+
+            const leaveRequest = {
+                teacherName: currentStaffName,
+                startDate: start,
+                endDate: end,
+                leaveType: type,
+                reason: reason,
+                status: 'Pending',
+                submittedAt: new Date().toISOString()
+            };
+
+            try {
+                let query = dbClient.from('exam_db').select('id, json_payload').eq('data_key', 'leave_requests');
+                const numericSchoolId = parseInt(schoolId, 10) || 1;
+                query = query.eq('school_id', numericSchoolId);
+                
+                const { data: existingData } = await query.limit(1);
+
+                let currentRequests = [];
+                let recordId = null;
+
+                if (existingData && existingData.length > 0) {
+                    let payload = existingData[0].json_payload;
+                    if (typeof payload === 'string') {
+                        try { payload = JSON.parse(payload); } catch(e) {}
+                    }
+                    currentRequests = Array.isArray(payload) ? payload : [];
+                    recordId = existingData[0].id;
+                }
+
+                currentRequests.push(leaveRequest);
+
+                if (recordId) {
+                    await dbClient.from('exam_db').update({ json_payload: currentRequests }).eq('id', recordId);
+                } else {
+                    const payloadObj = { data_key: 'leave_requests', json_payload: currentRequests, school_id: numericSchoolId };
+                    await dbClient.from('exam_db').insert(payloadObj);
+                }
+
+                alert("Leave application submitted successfully to the Administrator.");
+                document.getElementById('leaveStart').value = '';
+                document.getElementById('leaveEnd').value = '';
+                document.getElementById('leaveReason').value = '';
+                
+                await fetchAllData();
+
+            } catch (error) {
+                console.error("Error submitting leave:", error);
+                alert("Failed to submit application. Please check your network connection.");
+            }
+        }
+
+        async function debugFetchExamDB() {
+            const modal = document.getElementById('debugModal');
+            const output = document.getElementById('debugOutput');
+            modal.classList.remove('hidden');
+            output.textContent = "Fetching data from Supabase exam_db...";
+
+            try {
+                if (!dbClient) throw new Error("Supabase client missing.");
+                const numericSchoolId = parseInt(schoolId, 10) || 1;
+                
+                const { data, error } = await dbClient
+                    .from('exam_db')
+                    .select('*')
+                    .eq('school_id', numericSchoolId);
+
+                if (error) throw error;
+
+                const formattedData = data.map(row => {
+                    let payload = row.json_payload;
+                    if (typeof payload === 'string') {
+                        try { payload = JSON.parse(payload); } catch(e) {}
+                    }
+                    return {
+                        id: row.id,
+                        school_id: row.school_id,
+                        data_key: row.data_key,
+                        json_payload: payload
+                    };
+                });
+
+                output.textContent = JSON.stringify(formattedData, null, 2);
+            } catch (error) {
+                output.textContent = "ERROR: " + error.message + "\n\n" + JSON.stringify(error, null, 2);
+            }
+        }
+
+        function customLogout() {
+            sessionStorage.clear();
+            localStorage.clear();
+            window.location.href = 'index.html';
+        }
+    </script>
+</body>
+</html>
