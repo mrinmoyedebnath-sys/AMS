@@ -538,8 +538,11 @@ async function saveRoomEdit(idx, btn) {
         /* =====================================================
            ABSENTEE CHECKER VIEW
         ==================================================== */
+/* =====================================================
+           ABSENTEE CHECKER VIEW (SUPPORTING GIRLS & BOYS)
+        ==================================================== */
         function renderChecker(workspace) {
-            let uniqueDates = [...new Set(scheduleCache.map(s => s.date))].sort();
+            let uniqueDates = [...new Set(scheduleCache.map(s => s.date))].sort((a,b) => new Date(a) - new Date(b));
             let dateOptions = uniqueDates.map(d => `<option value="${d}">${d.split('-').reverse().join('-')}</option>`).join('');
 
             let allClasses = new Set();
@@ -557,58 +560,122 @@ async function saveRoomEdit(idx, btn) {
                         <div><label class="text-xs font-bold text-slate-600 block mb-1">Select Class:</label>
                         <select id="chkClass" class="w-full p-2.5 border border-slate-300 rounded font-bold text-slate-700 outline-none"><option value="">-- Class --</option>${classOptions}</select></div>
                         
+                        <div><label class="text-xs font-bold text-slate-600 block mb-1">Select Gender (Optional):</label>
+                        <select id="chkGender" class="w-full p-2.5 border border-slate-300 rounded font-bold text-slate-700 outline-none">
+                            <option value="">All Types</option>
+                            <option value="Girls">Girls</option>
+                            <option value="Boys">Boys</option>
+                            <option value="Mixed">Mixed</option>
+                        </select></div>
+
                         <div><label class="text-xs font-bold text-slate-600 block mb-1">Enter Roll No:</label>
                         <input type="number" id="chkRoll" class="w-full p-2.5 border border-slate-300 rounded font-bold text-slate-700 outline-none" placeholder="e.g. 15"></div>
                         
                         <button onclick="executeCheck()" class="bg-cyan-600 hover:bg-cyan-700 text-white font-bold py-3 rounded shadow-sm text-sm mt-2 transition-colors">Check Status</button>
                     </div>
-                    <div id="chkResult" class="hidden rounded-lg p-5 border-2 mt-4 shadow-inner"></div>
+                    <div id="chkResult" class="hidden mt-4 flex flex-col gap-2"></div>
                 </div>
             `;
         }
 
         function executeCheck() {
             const d = document.getElementById('chkDate').value;
-            const c = document.getElementById('chkClass').value;
+            const c = document.getElementById('chkClass').value.trim().toUpperCase();
+            const g = (document.getElementById('chkGender')?.value || '').trim().toUpperCase();
             const r = document.getElementById('chkRoll').value;
             const resBox = document.getElementById('chkResult');
 
-            if(!d || !c || !r) return alert("Fill all fields.");
+            if (!d || !c || !r) {
+                resBox.className = "mt-2 p-2 rounded border text-[10px] md:text-xs text-center font-bold bg-amber-50 text-amber-800 border-amber-300";
+                resBox.innerText = "Please select Date, Class, and enter Roll No.";
+                resBox.classList.remove('hidden');
+                return;
+            }
 
-            let foundRoom = null;
-            for(let room of roomConfigsCache) {
-                let classDet = room.classDetails.find(cd => cd.className === c);
-                if(classDet) {
+            let matchingRooms = [];
+
+            for (let room of roomConfigsCache) {
+                let roomGender = String(room.gender || '').trim().toUpperCase();
+                
+                // If a specific gender is selected, skip non-matching rooms
+                if (g && roomGender && roomGender !== g && roomGender !== 'MIXED') {
+                    continue;
+                }
+
+                // Safety fallback if classDetails is missing/empty
+                let details = room.classDetails || [];
+                if (details.length === 0 && room.classesList) {
+                    details = room.classesList.map(clsName => ({ className: clsName, rolls: "1-200" }));
+                }
+
+                let classDet = details.find(cd => String(cd.className).trim().toUpperCase() === c);
+                if (classDet) {
                     let rolls = expandRolls(classDet.rolls);
-                    if(rolls.includes(r.toString())) {
-                        foundRoom = room;
-                        break;
+                    if (rolls.length === 0 || rolls.includes(r.toString())) {
+                        matchingRooms.push(room);
                     }
                 }
             }
 
             resBox.classList.remove('hidden');
 
-            if(!foundRoom) {
-                resBox.className = "rounded-lg p-5 border-2 mt-4 shadow-inner border-amber-300 bg-amber-50 text-amber-800";
-                resBox.innerHTML = `<h3 class="font-black text-lg mb-1">⚠️ Not Allocated</h3><p class="text-sm">Roll ${r} of Class ${c} has no seat allocated in any room.</p>`;
+            if (matchingRooms.length === 0) {
+                resBox.className = "mt-2 p-3 rounded-lg border-2 text-center flex flex-col gap-1 leading-tight bg-amber-50 text-amber-800 border-amber-300 shadow-inner";
+                resBox.innerHTML = `
+                    <span class="font-black text-sm mb-1">⚠️ Not Allocated</span>
+                    <div class="bg-white/80 border border-amber-200 rounded p-2 mx-auto shadow-sm w-full">
+                        <span class="font-bold text-sm text-slate-800">Class ${c} - Roll ${r} ${g ? '(' + g + ')' : ''}</span>
+                    </div>
+                    <span class="text-[10px] mt-1">No seat allocated in any matching room.</span>`;
                 return;
             }
 
-            const isAbsent = absenteesCache[d] && absenteesCache[d][foundRoom.id] && absenteesCache[d][foundRoom.id].includes(`${c}_${r}`);
-            let dutyRec = dutyRecordsCache[d] && dutyRecordsCache[d][foundRoom.id] ? dutyRecordsCache[d][foundRoom.id].invigs.filter(Boolean).join(', ') : 'None Assigned';
+            let resultHTML = '';
+            
+            matchingRooms.forEach(foundRoom => {
+                let safeAbsData = absenteesCache[d] || {};
+                if (Array.isArray(safeAbsData)) safeAbsData = safeAbsData[0] || {};
+                
+                const isAbsent = safeAbsData[foundRoom.id] && safeAbsData[foundRoom.id].includes(`${c}_${r}`);
+                
+                let safeDutyData = dutyRecordsCache[d] || {};
+                if (Array.isArray(safeDutyData)) safeDutyData = safeDutyData[0] || {};
+                
+                let invigList = safeDutyData[foundRoom.id] ? (safeDutyData[foundRoom.id].invigs || []).filter(Boolean).join(', ') : '';
+                let dutyRec = invigList || 'None Assigned';
 
-            if(isAbsent) {
-                resBox.className = "rounded-lg p-5 border-2 mt-4 shadow-inner border-rose-400 bg-rose-50 text-rose-800";
-                resBox.innerHTML = `<div class="text-center"><h3 class="font-black text-2xl mb-2"><i class="fas fa-times-circle mr-2"></i>MARKED ABSENT</h3></div>
-                    <div class="mt-4 bg-white/50 p-3 rounded border border-rose-200"><p class="text-sm font-bold mb-1">Room ${foundRoom.name} (${foundRoom.gender})</p><p class="text-xs">Invigilators: ${dutyRec}</p></div>`;
-            } else {
-                resBox.className = "rounded-lg p-5 border-2 mt-4 shadow-inner border-emerald-400 bg-emerald-50 text-emerald-800";
-                resBox.innerHTML = `<div class="text-center"><h3 class="font-black text-2xl mb-2"><i class="fas fa-check-circle mr-2"></i>PRESENT / ALLOCATED</h3></div>
-                    <div class="mt-4 bg-white/50 p-3 rounded border border-emerald-200"><p class="text-sm font-bold mb-1">Room ${foundRoom.name} (${foundRoom.gender})</p><p class="text-xs">Invigilators: ${dutyRec}</p></div>`;
-            }
+                if (isAbsent) {
+                    resultHTML += `
+                    <div class="p-3 rounded-lg border-2 text-center flex flex-col gap-2 leading-tight bg-rose-50 text-rose-800 border-rose-300 shadow-inner">
+                        <span class="font-black text-sm"><i class="fas fa-times-circle mr-1"></i> MARKED ABSENT</span>
+                        <div class="bg-white/80 border border-rose-200 rounded p-2 mx-auto shadow-sm w-full">
+                            <span class="font-black text-sm text-slate-800 block">Class ${c} - Roll ${r}</span>
+                            <span class="font-bold text-xs text-rose-600 block mt-0.5">(${foundRoom.gender || 'General'})</span>
+                        </div>
+                        <div class="bg-white/50 rounded p-2 border border-rose-200">
+                            <span class="block font-bold text-xs text-slate-800">Allocated: Room ${foundRoom.name}</span>
+                            <span class="block text-[9px] mt-1 text-slate-600">Invigilators: ${dutyRec}</span>
+                        </div>
+                    </div>`;
+                } else {
+                    resultHTML += `
+                    <div class="p-3 rounded-lg border-2 text-center flex flex-col gap-2 leading-tight bg-emerald-50 text-emerald-800 border-emerald-300 shadow-sm">
+                        <span class="font-black text-sm"><i class="fas fa-check-circle mr-1"></i> ALLOCATED / PRESENT</span>
+                        <div class="bg-white/80 border border-emerald-200 rounded p-2 mx-auto shadow-sm w-full">
+                            <span class="font-black text-sm text-slate-800 block">Class ${c} - Roll ${r}</span>
+                            <span class="font-bold text-xs text-emerald-700 block mt-0.5">(${foundRoom.gender || 'General'})</span>
+                        </div>
+                        <div class="bg-white/50 rounded p-2 border border-emerald-200">
+                            <span class="block font-bold text-xs text-slate-800">Allocated: Room ${foundRoom.name}</span>
+                            <span class="block text-[9px] mt-1 text-slate-600">Invigilators: ${dutyRec}</span>
+                        </div>
+                    </div>`;
+                }
+            });
+
+            resBox.className = "mt-2 flex flex-col gap-2";
+            resBox.innerHTML = resultHTML;
         }
-
         /* =====================================================
            DUTY BOARD & SMART ASSIGN
         ==================================================== */
