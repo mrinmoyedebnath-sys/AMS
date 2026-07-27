@@ -3,185 +3,1407 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Exam Manager - Patkabari SaaS</title>
+    <title>Exam Duty & Absentee Manager</title>
     
     <!-- LIBRARIES -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf-autotable.umd.min.js"></script>
-    <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
 
     <style>
-        /* GLOBAL LOADING & SAAS CSS */
-        .hidden { display: none !important; }
-        #loading-overlay { position: fixed; top:0; left:0; width:100%; height:100%; background: #ffffff; z-index: 99999; display: flex; justify-content: center; align-items: center; flex-direction: column; transition: opacity 0.6s ease; }
-        .logo-spinner-container { position:relative; width:120px; height:120px; margin:0 auto 20px auto; }
-        .logo-spinner { position:absolute; width:100%; height:100%; border:4px solid #f3f3f3; border-top:4px solid #3f51b5; border-radius:50%; animation: spin 1.5s linear infinite; box-sizing: border-box; }
-        .logo-img { width:100px; height:100px; margin:10px; border-radius:50%; object-fit:cover; box-shadow:0 0 15px rgba(0,0,0,0.1); }
-        .welcome-text { color:#3f51b5; font-family:'Segoe UI', sans-serif; margin-top:10px; animation: pulse 1.5s infinite; }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        @keyframes pulse { 0% { opacity: 0.6; } 50% { opacity: 1; } 100% { opacity: 0.6; } }
-
-        /* EXAM MANAGER CSS */
-        body { font-family: 'Segoe UI', sans-serif; margin: 0; padding: 0; background-color: #f4f4f9; padding-top: 60px; font-size: 14px; }
-        .exam-header { position: fixed; top: 0; left: 0; width: 100%; background-color: #3f51b5; color: white; padding: 10px; z-index: 1000; box-shadow: 0 2px 5px rgba(0,0,0,0.2); display: flex; align-items: center; justify-content: space-between; box-sizing: border-box; }
-        .exam-header h1 { margin: 0; font-size: 1.2em; margin-left: 10px;}
-        #main-nav button, #main-nav a { padding: 8px 12px; margin: 0 5px; background-color: #ff9800; border: none; border-radius: 4px; color: white; cursor: pointer; font-weight: bold; text-decoration: none; display: inline-block; }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        .custom-scroll::-webkit-scrollbar { height: 6px; width: 6px; }
+        .custom-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
         
-        #app-container { padding: 20px; max-width: 1200px; margin: 0 auto; }
-        .card { background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 15px; transition: all 0.3s ease; }
-        .grid-container { display: grid; grid-template-columns: repeat(auto-fill, minmax(350px, 1fr)); gap: 15px; }
-        .exam-input, .exam-select { padding: 8px; border: 1px solid #ccc; border-radius: 4px; width: 100%; box-sizing: border-box; margin-bottom: 5px; }
-        .invig-select { background-color: #f8f9fa; border: 1px solid #999; font-weight: 500; color: #333; }
-        button.action-btn { background-color: #4CAF50; color: white; border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer; font-weight: bold; }
-        button.delete-btn { background-color: #f44336; color: white; border: none; padding: 5px 10px; border-radius: 3px; cursor: pointer; font-weight: bold; }
-        
-        #calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; margin-top: 10px; }
-        .day-header { background: #333; color: white; padding: 5px; text-align: center; font-weight: bold; }
-        .calendar-day { background: white; min-height: 80px; padding: 5px; border: 1px solid #eee; cursor: pointer; position: relative; }
-        .calendar-day:hover { background: #f9f9f9; }
-        .calendar-day.selected-date { border: 2px solid #ff9800; background: #fff8e1; }
-        .event-dot { display: block; font-size: 0.75em; padding: 3px; margin-top: 2px; border-radius: 3px; color: white; font-weight: bold; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .event-schedule { background-color: #2196F3; }
-        .duty-btn { font-size:0.7em; background:#4CAF50; color:#fff; border:none; border-radius:3px; padding:3px 6px; margin-top: 4px; display: inline-block; cursor: pointer; font-weight:bold;}
-        
-        .assignment-table { width: 100%; border-collapse: collapse; font-size: 0.9em; }
-        .assignment-table th, .assignment-table td { border: 1px solid #ddd; padding: 8px; text-align: center; vertical-align: top; }
-        .assignment-table th { background-color: #3f51b5; color: white; position: sticky; top: 60px; z-index: 90; }
-        .room-girls { background-color: #fce4ec; }
-        .room-boys { background-color: #e3f2fd; }
-        .ghost-text { display: block; font-size: 0.75em; color: #ff6b6b; font-weight: bold; font-style: italic; margin-top: 2px; pointer-events: none; text-align: left; }
-        
-        .custom-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 4000; justify-content: center; align-items: center; }
-        .custom-modal-content { background: white; padding: 20px; border-radius: 8px; width: 90%; max-width: 600px; max-height: 85vh; overflow-y: auto; }
-
-        .mobile-mode-active .grid-container { grid-template-columns: 1fr; }
-        .mobile-mode-active .assignment-table tr { display: block; border: 2px solid #3f51b5; margin-bottom: 15px; border-radius: 8px; background: #fff; }
-        .mobile-mode-active .assignment-table td { display: block; border: none; border-bottom: 1px solid #eee; position: relative; padding-left: 35%; text-align: left; min-height: 40px; }
-        .mobile-mode-active .assignment-table td::before { content: attr(data-label); position: absolute; left: 10px; top: 10px; width: 30%; font-weight: bold; color: #3f51b5; font-size: 0.85em; }
-        .overlay-active { position: fixed !important; top: 0 !important; left: 0 !important; width: 100vw !important; height: 100vh !important; z-index: 3500 !important; border-radius: 0 !important; margin: 0 !important; overflow-y: auto !important; padding: 20px !important; box-sizing: border-box !important; }
-
-        #schedule-context-menu { display: none; position: absolute; z-index: 10000; background: white; border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.25); padding: 15px; width: 250px; border: 2px solid #3f51b5; }
-        #schedule-context-menu h4 { margin-top: 0; color: #3f51b5; margin-bottom: 10px; border-bottom: 1px dashed #ccc; padding-bottom: 5px; font-size: 16px; }
-
-        /* PRINT STYLES */
-        .print-header { display: none; text-align: center; margin-bottom: 20px; border-bottom: 3px solid black; padding-bottom: 10px; }
-        .print-header h2 { margin: 0; font-size: 24px; text-transform: uppercase; }
-        .print-header h3 { margin: 5px 0; font-size: 18px; color: #333; }
         @media print {
-            .exam-header, #main-nav, .no-print { display: none !important; }
-            .print-header { display: block !important; }
-            #app-container { margin: 0; padding: 0; width: 100%; max-width: 100%; }
-            body { padding-top: 0; background: white; height: auto; overflow: visible; }
-            .card { box-shadow: none !important; border: none !important; padding: 0 !important; margin: 0 !important; position: static !important; height: auto !important; width: 100% !important; }
-            .assignment-table { font-size: 12pt !important; width: 100% !important; display: table !important; border-collapse: collapse !important; color: black; }
-            .assignment-table th, .assignment-table td { border: 2px solid black !important; padding: 6px; text-align: center; color: black !important; }
-            .assignment-table th { background-color: white !important; font-weight: 900; text-transform: uppercase; border-bottom: 3px solid black !important; }
-            .print-invig-text { display: block !important; white-space: pre-wrap; font-size: 12pt; font-weight: bold; }
-            .invigilator-list select, .action-btn, .ghost-text { display: none !important; }
+            body * { visibility: hidden; }
+            #printArea, #printArea * { visibility: visible; color: black !important; }
+            #printArea { position: absolute; left: 0; top: 0; width: 100%; display: block !important; }
+            .no-print { display: none !important; }
         }
     </style>
 </head>
-<body>
+<body class="bg-slate-100 h-screen flex flex-col overflow-hidden font-sans text-slate-800">
 
-    <!-- LOADING OVERLAY -->
-    <div id="loading-overlay">
-        <div style="text-align:center;">
-            <div class="logo-spinner-container">
-                <div class="logo-spinner"></div>
-                <img src="https://raw.githubusercontent.com/mrinmoyedebnath-sys/mylogo/main/STH.png" alt="School Logo" class="logo-img" crossorigin="anonymous">
+    <!-- TOP NAVIGATION -->
+    <nav class="bg-indigo-900 text-white shadow-lg p-3 md:p-4 flex justify-between items-center shrink-0 border-b-4 border-indigo-500 z-10 no-print">
+        <div class="flex items-center gap-3">
+            <div class="bg-white/10 p-2 rounded-lg hidden sm:block">
+                <i class="fas fa-tasks text-indigo-200 text-xl"></i>
             </div>
-            <h2 class="welcome-text">System Initializing...</h2>
+            <div>
+                <h1 class="text-sm md:text-xl font-black tracking-tight">Exam Manager</h1>
+                <p class="text-[9px] md:text-xs text-indigo-300 font-bold uppercase tracking-wider" id="examSchoolNameDisplay">Loading Workspace...</p>
+            </div>
+        </div>
+        <div class="flex items-center gap-1.5 md:gap-2">
+            <button id="btn-refresh" onclick="refreshData()" class="bg-indigo-700 hover:bg-indigo-600 text-white px-2.5 py-1.5 rounded shadow text-xs font-bold transition-colors">
+                <i class="fas fa-sync-alt"></i>
+            </button>
+            <a href="home.html" class="bg-slate-700 hover:bg-slate-600 text-white px-3 py-1.5 rounded shadow text-xs font-bold transition-colors flex items-center">
+                <i class="fas fa-home md:mr-1.5"></i> <span class="hidden md:inline">Hub</span>
+            </a>
+            <button onclick="renderView('checker')" class="bg-cyan-600 hover:bg-cyan-500 text-white px-3 py-1.5 rounded shadow text-xs font-black transition-colors flex items-center">
+                <i class="fas fa-search md:mr-1.5"></i> <span class="hidden md:inline">Checker</span>
+            </button>
+            <button onclick="renderView('setup')" class="bg-teal-600 hover:bg-teal-500 text-white px-3 py-1.5 rounded shadow text-xs font-black transition-colors flex items-center">
+                <i class="fas fa-cogs md:mr-1.5"></i> <span class="hidden md:inline">Setup</span>
+            </button>
+            <button onclick="renderView('duty')" class="bg-amber-500 hover:bg-amber-400 text-white px-3 py-1.5 rounded shadow text-xs font-black transition-colors flex items-center">
+                <i class="fas fa-user-check md:mr-1.5"></i> <span class="hidden md:inline">Duty Board</span>
+            </button>
+
+            <button onclick="renderView('stickers')" class="bg-pink-600 hover:bg-pink-500 text-white px-3 py-1.5 rounded shadow text-xs font-black transition-colors flex items-center">
+                <i class="fas fa-tags md:mr-1.5"></i> <span class="hidden md:inline">Stickers</span>
+            </button>
+        </div>
+    </nav>
+
+    <!-- MAIN WORKSPACE -->
+    <main class="flex-1 overflow-y-auto p-4 md:p-6 custom-scroll no-print" id="main-workspace"></main>
+
+    <!-- ABSENTEE MODAL -->
+    <div id="absenteeModal" class="fixed inset-0 bg-slate-900/80 hidden z-50 flex items-center justify-center backdrop-blur-sm no-print">
+        <div class="bg-white p-6 rounded-2xl shadow-2xl max-w-2xl w-full mx-4 border-t-4 border-rose-500 flex flex-col max-h-[90vh]">
+            <div class="flex justify-between items-center mb-4 shrink-0 border-b pb-2">
+                <div>
+                    <h3 class="text-lg font-black text-slate-800" id="absenteeModalTitle">Room Absentees</h3>
+                    <p class="text-xs text-slate-500">Tap a roll number to mark them absent.</p>
+                </div>
+                <button onclick="closeModal('absenteeModal')" class="text-slate-400 hover:text-rose-600 text-2xl transition-colors">&times;</button>
+            </div>
+            <div class="flex-1 overflow-y-auto custom-scroll mb-4 pr-2">
+                <div id="absenteeRollGrid" class="flex flex-col gap-4"></div>
+            </div>
+            <div class="flex gap-2 shrink-0 border-t pt-4">
+                <button onclick="closeModal('absenteeModal')" class="flex-1 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold py-2 rounded text-xs transition-colors">Cancel</button>
+                <button onclick="saveAbsentees()" class="flex-1 bg-rose-600 hover:bg-rose-700 text-white font-bold py-2 rounded text-xs transition-colors shadow-md">
+                    <i class="fas fa-save mr-1.5"></i> Save Absentees
+                </button>
+            </div>
         </div>
     </div>
 
-    <!-- EXAM CONTEXT MENU -->
-    <div id="schedule-context-menu">
-        <h4>📅 Quick Add Schedule</h4>
-        <input type="hidden" id="ctx-date">
-        <input type="text" id="ctx-exam" list="list-exams" class="exam-input" placeholder="Exam Name (e.g. 1st Summative)" style="font-weight:bold; margin-bottom:8px;">
-        <datalist id="list-exams"></datalist>
-        <div style="display:flex; gap:5px; margin-bottom:8px;">
-            <input type="text" id="ctx-time" class="exam-input" placeholder="Time" style="flex:1;">
-            <input type="text" id="ctx-class" class="exam-input" list="list-classes" placeholder="Class" style="flex:1;">
-        </div>
-        <input type="text" id="ctx-sub" class="exam-input" list="list-subjects" placeholder="Subject Name" style="margin-bottom:8px;">
-        <div style="display:flex; gap:5px; margin-top:5px;">
-            <button type="button" class="action-btn" style="flex:1; background:#4CAF50;" onclick="quickAddSchedule()">Save</button>
-            <button type="button" class="action-btn" style="flex:1; background:#f44336;" onclick="closeScheduleContextMenu()">Cancel</button>
-            <button type="button" class="action-btn" style="flex:1; background:#ff9800;" title="Delete all schedules on this date" onclick="clearScheduleOnRightClick()">🗑️ Clear</button>
-        </div>
-    </div>
-
-    <!-- EXAM MODALS -->
-    <div id="all-absentees-modal" class="custom-modal">
-        <div class="custom-modal-content" style="max-width: 700px;">
-            <div style="display:flex; justify-content:space-between; align-items:center;">
-                <h3 style="margin-top:0; color:#3f51b5;">🏫 Global Absentee Records</h3>
-                <button type="button" onclick="closeAllAbsenteesView()" style="background:none; border:none; font-size:1.5em; cursor:pointer; color:red;">&times;</button>
+    <!-- EXCLUDE STAFF MODAL -->
+    <div id="excludeModal" class="fixed inset-0 bg-slate-900/80 hidden z-50 flex items-center justify-center backdrop-blur-sm no-print">
+        <div class="bg-white p-6 rounded-2xl shadow-xl max-w-md w-full mx-4 flex flex-col max-h-[80vh] border-t-4 border-amber-500">
+            <div class="flex justify-between items-center mb-4 border-b pb-2 shrink-0">
+                <div>
+                    <h3 class="text-lg font-black text-slate-800">Exclude Staff</h3>
+                    <p class="text-[10px] text-slate-500">Do not assign these teachers on <b id="excludeDateDisplay"></b></p>
+                </div>
+                <button onclick="closeModal('excludeModal')" class="text-slate-400 hover:text-rose-600 text-2xl">&times;</button>
             </div>
-            <div style="margin-bottom:10px; background:#e8eaf6; padding:10px; border-radius:5px;">
-                <label style="font-weight:bold; color:#3f51b5;">Filter by Exam:</label>
-                <select id="absentee-exam-filter" class="exam-select" onchange="renderAllAbsenteesList(this.value)" style="margin-left:10px; width:60%; font-weight:bold; padding:5px;"></select>
-            </div>
-            <div id="all-absentees-list" style="max-height: 50vh; overflow-y: auto; margin-bottom: 15px; padding-right:5px;"></div>
-            <button type="button" class="action-btn" style="width:100%; font-size:1.1em; background:#3f51b5;" onclick="closeAllAbsenteesView()">Close</button>
-        </div>
-    </div>
-
-    <div id="print-absentee-modal" class="custom-modal">
-        <div class="custom-modal-content" style="max-width: 500px;">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 15px;">
-                <h3 style="margin:0; color:#4CAF50;">🖨️ Print Absentee List</h3>
-                <button type="button" onclick="closePrintAbsenteeModal()" style="background:none; border:none; font-size:1.5em; cursor:pointer; color:red;">&times;</button>
-            </div>
-            <div style="background:#f9f9f9; padding:15px; border-radius:8px; border: 1px solid #ddd; display:flex; flex-direction:column; gap:15px;">
-                <div><label style="font-weight:bold; color:#3f51b5;">Select Exam Type:</label><select id="print-filter-exam" class="exam-select"></select></div>
-                <div><label style="font-weight:bold; color:#3f51b5;">Select Class(es):</label><div id="print-filter-class-container" style="background:#fff; border:1px solid #bbb; padding:10px; margin-top:5px; max-height:120px; overflow-y:auto; display:flex; flex-wrap:wrap; gap:10px;"></div></div>
-                <div><label style="font-weight:bold; color:#3f51b5;">Select Subject & Date:</label><select id="print-filter-subject" class="exam-select"></select></div>
-                <button type="button" class="action-btn" style="background:#e91e63; font-size:1.2em; padding:12px; margin-top:10px;" onclick="generateAndPrintAbsenteeList()">📄 Generate Report</button>
+            <div id="excludeGrid" class="flex-1 overflow-y-auto custom-scroll grid grid-cols-2 gap-2 mb-4"></div>
+            <div class="shrink-0 border-t pt-4">
+                <button onclick="closeModal('excludeModal')" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 rounded text-xs shadow-md">Done</button>
             </div>
         </div>
     </div>
 
-    <div id="absentee-modal" class="custom-modal">
-        <div class="custom-modal-content">
-            <div style="display:flex; justify-content:space-between; align-items:center;">
-                <h3 style="margin-top:0; color:#e91e63;">📋 Review & Re-edit Absentees</h3>
-                <button onclick="closeAbsenteeReview()" style="background:none; border:none; font-size:1.5em; cursor:pointer; color:red;">&times;</button>
+    <!-- ROOM SHEET PRINT MODAL -->
+    <div id="roomPrintModal" class="fixed inset-0 bg-slate-900/80 hidden z-50 flex items-center justify-center backdrop-blur-sm no-print">
+        <div class="bg-white p-6 rounded-2xl shadow-2xl max-w-md w-full mx-4 border-t-4 border-indigo-500 flex flex-col">
+            <div class="flex justify-between items-center mb-4 border-b pb-2">
+                <h3 class="text-lg font-black text-slate-800">Print Room Sheet</h3>
+                <button onclick="closeModal('roomPrintModal')" class="text-slate-400 hover:text-rose-600 text-2xl transition-colors">&times;</button>
             </div>
-            <div id="absentee-list-container" style="max-height: 40vh; overflow-y: auto; margin-bottom: 15px; border:2px solid #ddd; padding:10px; border-radius:5px; background:#f9f9f9;"></div>
-            <button class="action-btn" style="width:100%; font-size:1.1em; background:#4CAF50;" onclick="closeAbsenteeReview()">✅ Save & Close</button>
+            <div class="mb-4">
+                <label class="block text-xs font-bold text-slate-700 mb-1">Select Room:</label>
+                <select id="printRoomSelect" onchange="populateRoomClasses()" class="w-full p-2 border border-slate-300 rounded outline-none font-bold text-slate-700">
+                    <option value="">-- Select a Room --</option>
+                </select>
+            </div>
+            <div class="mb-4">
+                <label class="block text-xs font-bold text-slate-700 mb-1">Select Classes to Include:</label>
+                <div id="printClassCheckboxes" class="bg-slate-50 p-3 rounded border border-slate-200 flex flex-col gap-2 max-h-40 overflow-y-auto">
+                    <p class="text-xs text-slate-400 italic">Select a room first.</p>
+                </div>
+            </div>
+            <div class="flex gap-2 border-t pt-4">
+                <button onclick="closeModal('roomPrintModal')" class="flex-1 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold py-2 rounded text-xs transition-colors">Cancel</button>
+                <button onclick="executeRoomPrint()" class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 rounded text-xs transition-colors flex justify-center items-center shadow-md">
+                    <i class="fas fa-print mr-1.5"></i> Generate Sheet
+                </button>
+            </div>
         </div>
     </div>
 
-    <!-- EXAM HEADER & NAV -->
-    <header class="exam-header">
-        <div style="display:flex; align-items:center; gap: 10px;">
-            <h1 id="app-title">Exam Manager</h1>
-            <label style="cursor:pointer; font-size: 0.85em; display:flex; align-items:center; font-weight:bold; background:rgba(0,0,0,0.2); padding:5px 8px; border-radius:4px;">
-                <input type="checkbox" id="mobile-mode-chk" onchange="toggleMobileMode()" style="width:16px; margin:0 5px 0 0; padding:0;"> 📱 Mobile
-            </label>
-        </div>
-        <nav id="main-nav">
-            <a href="home.html" style="background:#4a5568; border-radius: 20px;">🏠 Hub</a>
-            <button type="button" onclick="openStudentSearchModal()" style="background:#4CAF50; border-radius: 20px;">🔍 Room</button>
-            <button type="button" onclick="renderView('schedule')">🗓️ Sched</button>
-            <button type="button" onclick="renderView('dashboard')">📝 Duty</button>
-            <button type="button" onclick="renderView('manager')">⚙️ Setup</button>
-        </nav>
-    </header>
+    <!-- HIDDEN PRINT AREA -->
+    <div id="printArea" class="hidden bg-white"></div>
 
-    <main id="app-container"></main>
-
-    <datalist id="list-classes"></datalist>
-    <datalist id="list-subjects"></datalist>
-
+    <!-- SUPABASE & CORE LOGIC -->
     <script src="supabase-config.js"></script>
-    <script src="app.js"></script>
     <script>
-        // Tell app.js which module is active when loaded directly
-        window.activeModule = 'exam';
+        const dbClient = typeof supabaseClient !== 'undefined' ? supabaseClient : window.supabase;
+        let globalSchoolId = null;
+        let savedSchoolName = "Examination";
+        let currentActiveView = 'duty';
+        
+        let teachersCache = [];
+        let roomConfigsCache = [];
+        let scheduleCache = [];
+        let dutyRecordsCache = {}; 
+        let absenteesCache = {};
+        let recordIds = { rooms: null, schedule: null, duty: null, absentees: null, teachers: null };
+
+        window.addEventListener('DOMContentLoaded', async () => {
+            let role = sessionStorage.getItem('userRole') || localStorage.getItem('userRole'); 
+            globalSchoolId = sessionStorage.getItem('schoolId') || localStorage.getItem('schoolId');
+            savedSchoolName = sessionStorage.getItem('schoolName') || localStorage.getItem('schoolName') || "Examination";
+
+            if (role !== 'admin' || !globalSchoolId || isNaN(parseInt(globalSchoolId, 10))) {
+                alert("Unauthorized Access. Redirecting to login.");
+                window.location.href = 'index.html'; 
+                return;
+            }
+            document.getElementById('examSchoolNameDisplay').textContent = savedSchoolName;
+
+            await fetchExamData();
+            renderView('duty'); 
+        });
+
+        /* =====================================================
+           DATABASE FETCHING (FETCH ALL EXAM_DB DATA)
+        ==================================================== */
+        async function fetchExamData() {
+            try {
+                const numId = parseInt(globalSchoolId, 10);
+                
+                // Fetch ALL rows for this school from exam_db without filtering data_keys
+                const { data, error } = await dbClient
+                    .from('exam_db')
+                    .select('id, data_key, json_payload')
+                    .eq('school_id', numId);
+
+                if (error) throw error;
+
+                if (data && data.length > 0) {
+                    data.forEach(row => {
+                        let payload = row.json_payload;
+                        
+                        // Parse stringified JSON if necessary
+                        if (typeof payload === 'string') { 
+                            try { payload = JSON.parse(payload); } catch(e) { console.error("JSON Parse Error for", row.data_key); } 
+                        }
+                        
+                        // Map fetched data to correct caches with safe fallbacks
+                        if (row.data_key === 'teachers' || row.data_key === 'staff') { 
+                            if (Array.isArray(payload)) {
+                                // Handles both array of strings ["Name"] AND array of objects [{name: "Name"}]
+                                teachersCache = payload.map(t => typeof t === 'object' && t !== null ? t.name : t).filter(Boolean);
+                            } else {
+                                teachersCache = [];
+                            }
+                            recordIds.teachers = row.id; 
+                        }
+                        else if (row.data_key === 'roomConfigs') { 
+                            roomConfigsCache = Array.isArray(payload) ? payload : (Object.keys(payload || {}).length > 0 ? Object.values(payload) : []); 
+                            recordIds.rooms = row.id; 
+                        }
+                        else if (row.data_key === 'schedule') { 
+                            scheduleCache = Array.isArray(payload) ? payload : (Object.keys(payload || {}).length > 0 ? Object.values(payload) : []); 
+                            recordIds.schedule = row.id; 
+                        }
+                        else if (row.data_key === 'dutyRecords') { 
+                            dutyRecordsCache = (payload !== null && typeof payload === 'object' && !Array.isArray(payload)) ? payload : {}; 
+                            recordIds.duty = row.id; 
+                        }
+                        else if (row.data_key === 'absentees') { 
+                            absenteesCache = (payload !== null && typeof payload === 'object' && !Array.isArray(payload)) ? payload : {}; 
+                            recordIds.absentees = row.id; 
+                        }
+                    });
+                }
+                console.log("Exam Data successfully synced from Supabase.");
+            } catch (err) {
+                console.error("Fetch Error:", err);
+                alert("Failed to load exam data from server.");
+            }
+        }
+
+        async function refreshData() {
+            const btn = document.getElementById('btn-refresh');
+            if(btn) btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+            await fetchExamData();
+            renderView(currentActiveView);
+            if(btn) btn.innerHTML = '<i class="fas fa-sync-alt"></i>';
+        }
+
+        /* =====================================================
+           VIEW ROUTER
+        ==================================================== */
+        /* =====================================================
+           VIEW ROUTER & SETUP MANAGEMENT
+        ==================================================== */
+        function renderView(viewName) {
+            currentActiveView = viewName;
+            const workspace = document.getElementById('main-workspace');
+            
+            if (viewName === 'setup') {
+                workspace.innerHTML = `
+                    <div class="max-w-6xl mx-auto flex flex-col gap-6">
+                        <!-- CSV UPLOADERS -->
+                        <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                            <div class="bg-indigo-50 p-4 border-b border-indigo-100 flex items-center">
+                                <i class="fas fa-cogs text-indigo-600 mr-2 text-xl"></i><h2 class="font-black text-indigo-900">Architecture Setup</h2>
+                            </div>
+                            <div class="p-6 grid grid-cols-1 md:grid-cols-3 gap-6 bg-slate-50">
+                                <div class="bg-white p-4 rounded border border-slate-200 shadow-sm relative">
+                                    <h3 class="text-xs font-bold text-slate-700 uppercase tracking-wide mb-2">1. Room Configurations</h3>
+                                    <input type="file" id="csvRooms" accept=".csv" class="w-full text-xs text-slate-500 mb-2">
+                                    <button onclick="processCSV('rooms')" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 rounded text-xs transition-colors">Sync Rooms</button>
+                                </div>
+                                <div class="bg-white p-4 rounded border border-slate-200 shadow-sm relative">
+                                    <h3 class="text-xs font-bold text-slate-700 uppercase tracking-wide mb-2">2. Exam Schedule</h3>
+                                    <input type="file" id="csvSchedule" accept=".csv" class="w-full text-xs text-slate-500 mb-2">
+                                    <button onclick="processCSV('schedule')" class="w-full bg-teal-600 hover:bg-teal-700 text-white font-bold py-2 rounded text-xs transition-colors">Sync Schedule</button>
+                                </div>
+                                <div class="bg-white p-4 rounded border border-slate-200 shadow-sm relative">
+                                    <h3 class="text-xs font-bold text-slate-700 uppercase tracking-wide mb-2">3. Staff / Teachers</h3>
+                                    <input type="file" id="csvStaff" accept=".csv" class="w-full text-xs text-slate-500 mb-2">
+                                    <button onclick="processCSV('staff')" class="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 rounded text-xs transition-colors">Sync Staff</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- SYNCHRONIZED DATA VIEWER -->
+                        <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                            <div class="bg-slate-100 p-4 border-b border-slate-200 flex justify-between items-center">
+                                <h2 class="font-black text-slate-800"><i class="fas fa-database mr-2 text-indigo-500"></i> Synchronized Data</h2>
+                                <div class="flex gap-2">
+                                    <button onclick="switchSetupTab('schedule')" id="tab-setup-schedule" class="bg-indigo-600 text-white px-3 py-1.5 rounded font-bold text-xs shadow-sm transition-colors">📅 Exam Calendar</button>
+                                    <button onclick="switchSetupTab('rooms')" id="tab-setup-rooms" class="bg-slate-200 text-slate-700 hover:bg-slate-300 px-3 py-1.5 rounded font-bold text-xs shadow-sm transition-colors">🏫 Manage Rooms</button>
+                                </div>
+                            </div>
+                            <div id="setup-data-container" class="p-6 bg-slate-50 min-h-[300px]">
+                                <!-- Content injected via switchSetupTab -->
+                            </div>
+                        </div>
+                    </div>
+                `;
+                // Load the calendar tab by default when opening setup
+                setTimeout(() => switchSetupTab('schedule'), 50);
+            } 
+            else if (viewName === 'duty') {
+                buildDutyBoard(workspace);
+            } 
+            else if (viewName === 'checker') {
+                renderChecker(workspace);
+            }
+
+            else if (viewName === 'stickers') {
+                renderRoomStickers(workspace);
+            }
+        }
+
+        /* =====================================================
+           SETUP: TABS & EDITORS
+        ==================================================== */
+        function switchSetupTab(tab) {
+            const schedBtn = document.getElementById('tab-setup-schedule');
+            const roomsBtn = document.getElementById('tab-setup-rooms');
+            
+            if (tab === 'schedule') {
+                schedBtn.className = "bg-indigo-600 text-white px-3 py-1.5 rounded font-bold text-xs shadow-sm transition-colors";
+                roomsBtn.className = "bg-slate-200 text-slate-700 hover:bg-slate-300 px-3 py-1.5 rounded font-bold text-xs shadow-sm transition-colors";
+                renderScheduleCalendar();
+            } else {
+                roomsBtn.className = "bg-indigo-600 text-white px-3 py-1.5 rounded font-bold text-xs shadow-sm transition-colors";
+                schedBtn.className = "bg-slate-200 text-slate-700 hover:bg-slate-300 px-3 py-1.5 rounded font-bold text-xs shadow-sm transition-colors";
+                renderRoomManager();
+            }
+        }
+
+        function renderScheduleCalendar() {
+            const container = document.getElementById('setup-data-container');
+            if (!scheduleCache || scheduleCache.length === 0) {
+                container.innerHTML = '<p class="text-slate-500 italic text-center py-10 font-bold">No schedule synchronized yet. Upload CSV above.</p>';
+                return;
+            }
+
+            // Group schedules by date
+            let grouped = {};
+            scheduleCache.forEach(s => {
+                if(!grouped[s.date]) grouped[s.date] = [];
+                grouped[s.date].push(s);
+            });
+
+            let html = '<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">';
+            
+            Object.keys(grouped).sort().forEach(date => {
+                let displayDate = date.split('-').reverse().join('-');
+                html += `
+                <div class="bg-white border border-slate-200 rounded-lg shadow-sm overflow-hidden flex flex-col">
+                    <div class="bg-teal-600 text-white p-2 font-black text-center text-sm border-b-2 border-teal-700">
+                        <i class="fas fa-calendar-day mr-2"></i>${displayDate}
+                    </div>
+                    <div class="p-3 flex flex-col gap-2 flex-1">`;
+                
+                // Sort by time within the day
+                grouped[date].sort((a,b) => a.time.localeCompare(b.time)).forEach(exam => {
+                    html += `
+                        <div class="border-l-4 border-teal-500 pl-2 bg-slate-50 p-2 rounded shadow-sm">
+                            <div class="text-[11px] font-black text-indigo-900 uppercase">${exam.examName || 'Exam'}</div>
+                            <div class="text-[11px] font-bold text-rose-600 mt-1">${exam.subject}</div>
+                            <div class="text-[10px] text-slate-600 mt-1 flex justify-between">
+                                <span><i class="fas fa-clock text-teal-600 mr-1"></i> ${exam.time}</span>
+                                <span class="bg-slate-200 px-1 rounded font-bold">Class: ${exam.classes}</span>
+                            </div>
+                        </div>`;
+                });
+                html += `</div></div>`;
+            });
+            html += '</div>';
+            container.innerHTML = html;
+        }
+
+/* =====================================================
+           CSV PROCESSORS (Rooms)
+        ===================================================== */
+        async function processRoomCSV() {
+            const file = document.getElementById('csvRooms').files[0];
+            if (!file) return alert("Select a Room CSV first.");
+            
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+                const rows = e.target.result.split('\n');
+                let newRooms = [];
+                for(let i=1; i<rows.length; i++) { // Skip header
+                    let cols = rows[i].split(',');
+                    if (cols.length >= 4 && cols[0].trim() !== '') {
+                        
+                        // Parse classes from CSV (e.g., "V-A;V-B")
+                        let rawClasses = cols[3].trim().replace(/\r/g, '');
+                        let classArray = rawClasses.split(/[\s,;]+/).filter(Boolean);
+                        let totalCap = parseInt(cols[2].trim(), 10) || 0;
+                        
+                        // Automatically build the details structure for editing
+                        let details = classArray.map(c => ({
+                            className: c,
+                            rolls: "1-40", // Default placeholder for rolls
+                            capacity: Math.floor(totalCap / classArray.length) || 0 // Divide capacity evenly
+                        }));
+
+                        newRooms.push({
+                            id: 'R' + Date.now() + i,
+                            name: cols[0].trim(),
+                            gender: cols[1].trim(),
+                            totalCapacity: totalCap,
+                            classesList: classArray,
+                            classDetails: details
+                        });
+                    }
+                }
+                if(newRooms.length > 0) {
+                    roomConfigsCache = newRooms;
+                    await saveToDB('roomConfigs', roomConfigsCache, 'rooms');
+                    alert(`Imported ${newRooms.length} rooms successfully. Go to 'Manage Rooms' to set exact rolls.`);
+                    // Auto-switch to the Room Manager tab to see the results
+                    switchSetupTab('rooms');
+                } else {
+                    alert("No valid rows found. Ensure you have 4 columns: Room Name, Gender, Capacity, Classes.");
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        /* =====================================================
+           SETUP TABS: ROOM EDITING
+        ==================================================== */
+        function renderRoomManager() {
+            const container = document.getElementById('setup-data-container');
+            if (!roomConfigsCache || roomConfigsCache.length === 0) {
+                container.innerHTML = '<p class="text-slate-500 italic text-center py-10 font-bold">No rooms synchronized yet. Upload CSV above.</p>';
+                return;
+            }
+
+            let html = `<div class="overflow-x-auto rounded-lg shadow-sm border border-slate-200">
+                <table class="w-full text-xs text-left border-collapse bg-white">
+                <thead class="bg-slate-200 text-slate-700">
+                    <tr>
+                        <th class="p-3 border-b font-black uppercase w-32">Room Name</th>
+                        <th class="p-3 border-b font-black uppercase w-24">Gender</th>
+                        <th class="p-3 border-b font-black uppercase">Classes & Rolls <span class="text-[9px] font-normal normal-case block text-slate-500 mt-0.5">Format: Class | Rolls | Capacity (One per line)</span></th>
+                        <th class="p-3 border-b font-black uppercase text-center w-24">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>`;
+            
+            roomConfigsCache.forEach((room, idx) => {
+                
+                // Safety fallback for older data that doesn't have classDetails mapped
+                let details = room.classDetails || [];
+                if (details.length === 0 && room.classesList) {
+                     details = room.classesList.map(c => ({ className: c, rolls: "1-40", capacity: room.totalCapacity || 40 }));
+                }
+
+                // Pre-fill textarea with existing classes, rolls, and capacities
+                let classText = details.map(c => `${c.className} | ${c.rolls || '1-40'} | ${c.capacity}`).join('\n');
+
+                html += `
+                <tr class="border-b hover:bg-slate-50 transition-colors align-top">
+                    <td class="p-2"><input type="text" id="edit-room-name-${idx}" value="${room.name}" class="w-full border border-slate-300 p-1.5 rounded outline-none focus:border-indigo-500 font-bold text-slate-800 shadow-inner"></td>
+                    <td class="p-2">
+                        <select id="edit-room-gender-${idx}" class="w-full border border-slate-300 p-1.5 rounded outline-none focus:border-indigo-500 font-bold text-slate-700 bg-white shadow-inner">
+                            <option value="Boys" ${room.gender && room.gender.toLowerCase() === 'boys' ? 'selected' : ''}>Boys</option>
+                            <option value="Girls" ${room.gender && room.gender.toLowerCase() === 'girls' ? 'selected' : ''}>Girls</option>
+                            <option value="Mixed" ${room.gender && room.gender.toLowerCase() === 'mixed' ? 'selected' : ''}>Mixed</option>
+                        </select>
+                    </td>
+                    <td class="p-2">
+                        <textarea id="edit-room-classes-${idx}" rows="3" class="w-full border border-slate-300 p-1.5 rounded outline-none focus:border-indigo-500 text-[11px] font-mono text-slate-800 leading-relaxed whitespace-pre shadow-inner" spellcheck="false">${classText}</textarea>
+                    </td>
+                    <td class="p-2 text-center">
+                        <button onclick="saveRoomEdit(${idx}, this)" class="bg-emerald-500 hover:bg-emerald-600 text-white px-3 py-1.5 rounded shadow-sm text-[10px] font-black transition-colors flex items-center justify-center w-full mt-1">
+                            <i class="fas fa-save mr-1"></i> Save
+                        </button>
+                    </td>
+                </tr>`;
+            });
+
+            html += `</tbody></table></div>`;
+            container.innerHTML = html;
+        }
+
+
+async function saveRoomEdit(idx, btn) {
+            const nameEl = document.getElementById(`edit-room-name-${idx}`);
+            const genderEl = document.getElementById(`edit-room-gender-${idx}`);
+            const classesEl = document.getElementById(`edit-room-classes-${idx}`);
+
+            const newName = nameEl.value.trim();
+            const newGender = genderEl.value;
+            const classLines = classesEl.value.split('\n').filter(l => l.trim() !== '');
+
+            if (!newName) return alert("Please provide a valid Room Name.");
+
+            let newClassDetails = [];
+            let newClassesList = [];
+            let totalCap = 0;
+
+            for (let line of classLines) {
+                let parts = line.split('|').map(p => p.trim());
+                if(parts.length >= 3) {
+                    let cName = parts[0];
+                    let cRolls = parts[1];
+                    let cCap = parseInt(parts[2], 10);
+                    if(!isNaN(cCap)) {
+                        newClassesList.push(cName);
+                        newClassDetails.push({ className: cName, rolls: cRolls, capacity: cCap });
+                        totalCap += cCap;
+                    }
+                } else {
+                    return alert("Invalid format. Please use: Class | Rolls | Capacity");
+                }
+            }
+
+            roomConfigsCache[idx].name = newName;
+            roomConfigsCache[idx].gender = newGender;
+            roomConfigsCache[idx].classesList = newClassesList;
+            roomConfigsCache[idx].classDetails = newClassDetails;
+            roomConfigsCache[idx].totalCapacity = totalCap;
+
+            // Button feedback
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+            btn.classList.replace('bg-emerald-500', 'bg-slate-500');
+
+            try {
+                await saveToDB('roomConfigs', roomConfigsCache, 'rooms');
+                btn.innerHTML = '<i class="fas fa-check mr-1"></i> Saved';
+                btn.classList.replace('bg-slate-500', 'bg-emerald-600');
+                setTimeout(() => {
+                    btn.innerHTML = '<i class="fas fa-save mr-1"></i> Save';
+                    btn.classList.replace('bg-emerald-600', 'bg-emerald-500');
+                }, 2000);
+            } catch (e) {
+                alert("Failed to save room update to server.");
+                btn.innerHTML = '<i class="fas fa-save mr-1"></i> Save';
+                btn.classList.replace('bg-slate-500', 'bg-emerald-500');
+            }
+        }
+
+        /* =====================================================
+           ABSENTEE CHECKER VIEW
+        ==================================================== */
+        function renderChecker(workspace) {
+            let uniqueDates = [...new Set(scheduleCache.map(s => s.date))].sort();
+            let dateOptions = uniqueDates.map(d => `<option value="${d}">${d.split('-').reverse().join('-')}</option>`).join('');
+
+            let allClasses = new Set();
+            roomConfigsCache.forEach(r => r.classesList.forEach(c => allClasses.add(c)));
+            let classOptions = Array.from(allClasses).sort().map(c => `<option value="${c}">${c}</option>`).join('');
+
+            workspace.innerHTML = `
+                <div class="max-w-2xl mx-auto bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+                    <h2 class="font-black text-slate-800 text-lg mb-4 border-b pb-2"><i class="fas fa-search text-cyan-500 mr-2"></i> Absentee & Room Checker</h2>
+                    
+                    <div class="flex flex-col gap-4 mb-6">
+                        <div><label class="text-xs font-bold text-slate-600 block mb-1">Select Date:</label>
+                        <select id="chkDate" class="w-full p-2.5 border border-slate-300 rounded font-bold text-slate-700 outline-none"><option value="">-- Date --</option>${dateOptions}</select></div>
+                        
+                        <div><label class="text-xs font-bold text-slate-600 block mb-1">Select Class:</label>
+                        <select id="chkClass" class="w-full p-2.5 border border-slate-300 rounded font-bold text-slate-700 outline-none"><option value="">-- Class --</option>${classOptions}</select></div>
+                        
+                        <div><label class="text-xs font-bold text-slate-600 block mb-1">Enter Roll No:</label>
+                        <input type="number" id="chkRoll" class="w-full p-2.5 border border-slate-300 rounded font-bold text-slate-700 outline-none" placeholder="e.g. 15"></div>
+                        
+                        <button onclick="executeCheck()" class="bg-cyan-600 hover:bg-cyan-700 text-white font-bold py-3 rounded shadow-sm text-sm mt-2 transition-colors">Check Status</button>
+                    </div>
+                    <div id="chkResult" class="hidden rounded-lg p-5 border-2 mt-4 shadow-inner"></div>
+                </div>
+            `;
+        }
+
+        function executeCheck() {
+            const d = document.getElementById('chkDate').value;
+            const c = document.getElementById('chkClass').value;
+            const r = document.getElementById('chkRoll').value;
+            const resBox = document.getElementById('chkResult');
+
+            if(!d || !c || !r) return alert("Fill all fields.");
+
+            let foundRoom = null;
+            for(let room of roomConfigsCache) {
+                let classDet = room.classDetails.find(cd => cd.className === c);
+                if(classDet) {
+                    let rolls = expandRolls(classDet.rolls);
+                    if(rolls.includes(r.toString())) {
+                        foundRoom = room;
+                        break;
+                    }
+                }
+            }
+
+            resBox.classList.remove('hidden');
+
+            if(!foundRoom) {
+                resBox.className = "rounded-lg p-5 border-2 mt-4 shadow-inner border-amber-300 bg-amber-50 text-amber-800";
+                resBox.innerHTML = `<h3 class="font-black text-lg mb-1">⚠️ Not Allocated</h3><p class="text-sm">Roll ${r} of Class ${c} has no seat allocated in any room.</p>`;
+                return;
+            }
+
+            const isAbsent = absenteesCache[d] && absenteesCache[d][foundRoom.id] && absenteesCache[d][foundRoom.id].includes(`${c}_${r}`);
+            let dutyRec = dutyRecordsCache[d] && dutyRecordsCache[d][foundRoom.id] ? dutyRecordsCache[d][foundRoom.id].invigs.filter(Boolean).join(', ') : 'None Assigned';
+
+            if(isAbsent) {
+                resBox.className = "rounded-lg p-5 border-2 mt-4 shadow-inner border-rose-400 bg-rose-50 text-rose-800";
+                resBox.innerHTML = `<div class="text-center"><h3 class="font-black text-2xl mb-2"><i class="fas fa-times-circle mr-2"></i>MARKED ABSENT</h3></div>
+                    <div class="mt-4 bg-white/50 p-3 rounded border border-rose-200"><p class="text-sm font-bold mb-1">Room ${foundRoom.name} (${foundRoom.gender})</p><p class="text-xs">Invigilators: ${dutyRec}</p></div>`;
+            } else {
+                resBox.className = "rounded-lg p-5 border-2 mt-4 shadow-inner border-emerald-400 bg-emerald-50 text-emerald-800";
+                resBox.innerHTML = `<div class="text-center"><h3 class="font-black text-2xl mb-2"><i class="fas fa-check-circle mr-2"></i>PRESENT / ALLOCATED</h3></div>
+                    <div class="mt-4 bg-white/50 p-3 rounded border border-emerald-200"><p class="text-sm font-bold mb-1">Room ${foundRoom.name} (${foundRoom.gender})</p><p class="text-xs">Invigilators: ${dutyRec}</p></div>`;
+            }
+        }
+
+        /* =====================================================
+           DUTY BOARD & SMART ASSIGN
+        ==================================================== */
+        
+/* =====================================================
+           DUTY BOARD & CALENDAR UI
+        ==================================================== */
+        function buildDutyBoard(workspace) {
+            if(scheduleCache.length === 0 || roomConfigsCache.length === 0) {
+                workspace.innerHTML = `<div class="p-6 text-center text-slate-500 font-bold">Please setup Rooms and Schedule via Setup first.</div>`;
+                return;
+            }
+
+            // Strictly sort dates in ascending chronological order
+            let uniqueDates = [...new Set(scheduleCache.map(s => s.date))].sort((a,b) => new Date(a) - new Date(b));
+            
+            // Build visual calendar cards
+            let dateCards = uniqueDates.map(d => {
+                let dateObj = new Date(d);
+                let dayName = dateObj.toLocaleDateString('en-US', { weekday: 'short' });
+                let dayNum = dateObj.toLocaleDateString('en-US', { day: '2-digit' });
+                let monthName = dateObj.toLocaleDateString('en-US', { month: 'short' });
+                return `<button onclick="document.getElementById('activeDate').value='${d}'; selectDateCard(this); renderDutyGrid()" class="date-card min-w-[75px] flex flex-col items-center justify-center p-2 rounded-lg border border-slate-200 bg-slate-50 hover:bg-indigo-50 hover:border-indigo-300 transition-colors shadow-sm focus:outline-none shrink-0" data-date="${d}">
+                            <span class="text-[10px] font-bold text-slate-500 uppercase">${monthName}</span>
+                            <span class="text-xl font-black text-slate-800 my-0.5">${dayNum}</span>
+                            <span class="text-[10px] font-bold text-slate-500">${dayName}</span>
+                        </button>`;
+            }).join('');
+
+            workspace.innerHTML = `
+                <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4 mb-6">
+                    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 border-b pb-3 gap-3">
+                        <h2 class="font-black text-slate-800 text-lg flex items-center"><i class="fas fa-clipboard-list mr-2 text-amber-500"></i>Duty & Absentee Board</h2>
+                        <div class="flex gap-2 w-full sm:w-auto">
+                            <input type="hidden" id="activeDate" value="">
+                            <button onclick="executeSmartAssign()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-3 py-2 rounded text-xs shadow-sm">
+                                <i class="fas fa-magic mr-1"></i> Auto-Assign
+                            </button>
+                            <button onclick="openExcludeModal()" class="bg-rose-500 hover:bg-rose-600 text-white font-bold px-3 py-2 rounded text-xs shadow-sm" title="Exclude Staff">
+                                <i class="fas fa-user-slash"></i>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- NEW CALENDAR STRIP -->
+                    <div class="mb-4 bg-slate-100 p-3 rounded-lg border border-slate-200">
+                        <label class="block text-[10px] font-black text-slate-500 mb-2 uppercase tracking-wide"><i class="fas fa-calendar-alt text-indigo-500 mr-1"></i> Select Exam Date:</label>
+                        <div class="flex gap-3 overflow-x-auto pb-2 custom-scroll" id="calendar-strip">
+                            ${dateCards}
+                        </div>
+                    </div>
+
+                    <div class="flex flex-wrap gap-2 mb-4 border-t pt-4">
+                        <button onclick="openRoomPrintModal()" class="bg-slate-700 hover:bg-slate-800 text-white px-3 py-1.5 rounded text-xs font-bold shadow-sm"><i class="fas fa-file-alt mr-1"></i> Print Room Sheets</button>
+                        <button onclick="printDutyRoster()" class="bg-purple-600 hover:bg-purple-700 text-white px-3 py-1.5 rounded text-xs font-bold shadow-sm"><i class="fas fa-print mr-1"></i> Print Duty Roster</button>
+                    </div>
+                    <div id="dutyGridArea"><p class="text-xs text-slate-400 italic text-center py-8">Select a date from the calendar strip above to load rooms and assign duties.</p></div>
+                </div>
+            `;
+        }
+
+        // Helper to animate calendar selection
+        function selectDateCard(activeBtn) {
+            document.querySelectorAll('.date-card').forEach(btn => {
+                btn.classList.remove('bg-indigo-100', 'border-indigo-500', 'ring-2', 'ring-indigo-200');
+                btn.classList.add('bg-slate-50', 'border-slate-200');
+            });
+            activeBtn.classList.remove('bg-slate-50', 'border-slate-200');
+            activeBtn.classList.add('bg-indigo-100', 'border-indigo-500', 'ring-2', 'ring-indigo-200');
+        }
+
+function renderDutyGrid() {
+            const date = document.getElementById('activeDate').value;
+            const gridArea = document.getElementById('dutyGridArea');
+            if(!date) { gridArea.innerHTML = ''; return; }
+
+            if(!dutyRecordsCache[date]) dutyRecordsCache[date] = {};
+            if(!dutyRecordsCache[date].meta) dutyRecordsCache[date].meta = { isLocked: false };
+            if(!absenteesCache[date]) absenteesCache[date] = {};
+
+            const isLocked = dutyRecordsCache[date].meta.isLocked === true || dutyRecordsCache[date].meta.isLocked === "true";
+            const lockBtnClass = isLocked ? "bg-rose-500 hover:bg-rose-600" : "bg-emerald-500 hover:bg-emerald-600";
+            const lockBtnIcon = isLocked ? "fa-lock" : "fa-lock-open";
+            const lockBtnText = isLocked ? "Locked (Staff View-Only)" : "Unlocked (Staff Can Edit Absentees)";
+
+            let tableHTML = `
+                <div class="flex justify-between items-center mb-3 p-3 bg-slate-50 border border-slate-200 rounded-lg shadow-sm">
+                    <span class="text-sm font-bold text-slate-700"><i class="fas fa-shield-alt text-indigo-500 mr-1.5"></i>Absentee Portal Status:</span>
+                    <button onclick="toggleDateLock('${date}')" class="${lockBtnClass} text-white px-4 py-1.5 rounded shadow-md text-xs font-bold transition-colors flex items-center">
+                        <i class="fas ${lockBtnIcon} mr-2"></i> ${lockBtnText}
+                    </button>
+                </div>
+                <table class="w-full border-collapse text-xs text-left">
+                <thead><tr class="bg-slate-200 text-slate-700">
+                    <th class="p-3 border font-black uppercase w-1/3">Room Details & Absentees</th>
+                    <th class="p-3 border font-black uppercase w-2/3">Invigilators (Max 3)</th>
+                </tr></thead><tbody class="bg-white">`;
+
+            let tOptions = `<option value="">- Select Teacher -</option>`;
+            teachersCache.forEach(t => tOptions += `<option value="${t}">${t}</option>`);
+
+            roomConfigsCache.forEach(room => {
+                let rDuty = dutyRecordsCache[date][room.id] || { invigs: ['', ''] };
+                if(!rDuty.invigs) rDuty.invigs = ['', ''];
+
+                let bg = room.gender.toLowerCase() === 'girls' ? 'bg-pink-50' : 'bg-blue-50';
+                let absentCount = (absenteesCache[date][room.id] || []).length;
+                let absentBadge = absentCount > 0 ? `<span class="bg-rose-500 text-white px-1.5 py-0.5 rounded text-[9px] font-bold mt-1 inline-block">${absentCount} Absent</span>` : '';
+
+                let invigSelectors = rDuty.invigs.map((inv, idx) => `
+                    <div class="flex items-center gap-1 mb-1">
+                        <select onchange="updateDuty('${date}', '${room.id}', ${idx}, this.value)" class="flex-1 p-1.5 border border-slate-300 rounded outline-none shadow-inner font-bold text-slate-700 bg-white">
+                            ${tOptions.replace(`value="${inv}"`, `value="${inv}" selected`)}
+                        </select>
+                        <button onclick="removeInvig('${date}', '${room.id}', ${idx})" class="text-rose-500 hover:bg-rose-100 p-1.5 rounded"><i class="fas fa-times"></i></button>
+                    </div>
+                `).join('');
+
+                let addBtn = rDuty.invigs.length < 3 ? `<button onclick="addInvig('${date}', '${room.id}')" class="text-[10px] bg-slate-200 hover:bg-slate-300 text-slate-700 px-2 py-1 rounded font-bold mt-1 shadow-sm">+ Add Teacher</button>` : '';
+
+                tableHTML += `
+                    <tr class="${bg} border-b border-slate-200">
+                        <td class="p-3 border align-top">
+                            <div class="flex justify-between items-start mb-2">
+                                <div>
+                                    <span class="font-black text-slate-800 text-sm">Room ${room.name}</span>
+                                    <span class="text-[10px] text-slate-500 block font-bold">Cap: ${room.totalCapacity} | ${room.gender}</span>
+                                </div>
+                                <button onclick="openAbsenteeModal('${date}', '${room.id}')" class="bg-white text-rose-600 hover:bg-rose-50 px-2 py-1 rounded text-[10px] font-bold border border-rose-200 shadow-sm transition-colors">
+                                    <i class="fas fa-user-times"></i> Absentees
+                                </button>
+                            </div>
+                            <div class="text-[10px] font-bold text-slate-700">Classes: ${room.classesList.join(', ')}</div>
+                            ${absentBadge}
+                        </td>
+                        <td class="p-3 border align-top bg-white/50">
+                            ${invigSelectors}
+                            ${addBtn}
+                        </td>
+                    </tr>`;
+            });
+
+            tableHTML += `</tbody></table>
+                <div class="mt-4 flex justify-end">
+                    <button onclick="saveDutyRecords()" class="bg-emerald-600 hover:bg-emerald-700 text-white font-black px-6 py-3 rounded shadow-md transition-colors text-sm">
+                        <i class="fas fa-save mr-2"></i> Save Duty Assignments
+                    </button>
+                </div>`;
+            gridArea.innerHTML = tableHTML;
+        }
+
+        async function toggleDateLock(date) {
+            if(!dutyRecordsCache[date]) dutyRecordsCache[date] = {};
+            if(!dutyRecordsCache[date].meta) dutyRecordsCache[date].meta = { isLocked: false };
+            
+            // Flip the boolean status
+            let currentState = dutyRecordsCache[date].meta.isLocked === true || dutyRecordsCache[date].meta.isLocked === "true";
+            dutyRecordsCache[date].meta.isLocked = !currentState;
+            
+            // Instantly refresh the UI to show the new color
+            renderDutyGrid();
+            
+            // Auto-save the lock status to Supabase so staff apps sync immediately
+            try {
+                await saveToDB('dutyRecords', dutyRecordsCache, 'duty');
+            } catch (err) {
+                alert("Error syncing lock status with the server.");
+            }
+        }
+
+        function updateDuty(date, roomId, index, val) {
+            if(!dutyRecordsCache[date][roomId]) dutyRecordsCache[date][roomId] = { invigs: [] };
+            dutyRecordsCache[date][roomId].invigs[index] = val;
+            renderDutyGrid(); // Re-render to update the disabled options immediately
+        }
+        function addInvig(date, roomId) {
+            if(!dutyRecordsCache[date][roomId]) dutyRecordsCache[date][roomId] = { invigs: [] };
+            if(dutyRecordsCache[date][roomId].invigs.length < 3) {
+                dutyRecordsCache[date][roomId].invigs.push('');
+                renderDutyGrid();
+            }
+        }
+        function removeInvig(date, roomId, index) {
+            if(dutyRecordsCache[date][roomId] && dutyRecordsCache[date][roomId].invigs) {
+                dutyRecordsCache[date][roomId].invigs.splice(index, 1);
+                renderDutyGrid();
+            }
+        }
+
+        /* =====================================================
+           EXCLUDE & SMART ASSIGN
+        ==================================================== */
+        function openExcludeModal() {
+            const date = document.getElementById('activeDate').value;
+            if(!date) return alert('Select date first');
+            
+            if(!dutyRecordsCache[date]) dutyRecordsCache[date] = {};
+            if(!dutyRecordsCache[date].excluded) dutyRecordsCache[date].excluded = [];
+            
+            document.getElementById('excludeDateDisplay').innerText = date.split('-').reverse().join('-');
+            
+            let html = '';
+            let sorted = [...teachersCache].sort((a,b) => a.localeCompare(b));
+            sorted.forEach(t => {
+                let isChecked = dutyRecordsCache[date].excluded.includes(t) ? 'checked' : '';
+                html += `<label class="flex items-center gap-2 p-2 bg-slate-50 border border-slate-200 rounded text-xs font-bold text-slate-700 cursor-pointer hover:bg-indigo-50 transition-colors"><input type="checkbox" value="${t}" class="w-4 h-4 text-indigo-600" ${isChecked} onchange="toggleExclude('${date}', '${t}', this.checked)"> ${t}</label>`;
+            });
+            document.getElementById('excludeGrid').innerHTML = html;
+            document.getElementById('excludeModal').classList.remove('hidden');
+        }
+
+        function toggleExclude(date, teacher, isChecked) {
+            let exc = dutyRecordsCache[date].excluded;
+            if(isChecked && !exc.includes(teacher)) exc.push(teacher);
+            else if(!isChecked && exc.includes(teacher)) dutyRecordsCache[date].excluded = exc.filter(t => t !== teacher);
+            saveToDB('dutyRecords', dutyRecordsCache, 'duty'); // Save silently
+        }
+
+
+function executeSmartAssign() {
+            const date = document.getElementById('activeDate').value;
+            if(!date) return alert("Select a date first.");
+
+            // Calculate historical workload across all dates
+            let workload = {};
+            teachersCache.forEach(t => workload[t] = 0);
+            Object.keys(dutyRecordsCache).forEach(d => {
+                Object.keys(dutyRecordsCache[d]).forEach(key => {
+                    // Ignore metadata and exclusions
+                    if(key === 'meta' || key === 'excluded') return; 
+                    
+                    let room = dutyRecordsCache[d][key];
+                    (room.invigs || []).forEach(i => { if(i) workload[i]++; });
+                });
+            });
+
+            // Sort teachers so those with least duties get assigned first
+            let availableTeachers = [...teachersCache].sort((a, b) => workload[a] - workload[b]);
+            if(!dutyRecordsCache[date]) dutyRecordsCache[date] = {};
+            
+            let tIndex = 0;
+            roomConfigsCache.forEach((room) => {
+                // Preserve meta if it exists, otherwise initialize just the room
+                if(!dutyRecordsCache[date][room.id]) dutyRecordsCache[date][room.id] = { invigs: [] };
+                dutyRecordsCache[date][room.id].invigs = []; // clear existing for fresh assign
+                
+                if (tIndex < availableTeachers.length) dutyRecordsCache[date][room.id].invigs.push(availableTeachers[tIndex++]);
+                if (tIndex < availableTeachers.length) dutyRecordsCache[date][room.id].invigs.push(availableTeachers[tIndex++]);
+            });
+
+            renderDutyGrid();
+        }
+
+        async function saveDutyRecords() {
+            await saveToDB('dutyRecords', dutyRecordsCache, 'duty');
+            alert("Duty assignments securely saved to database.");
+        }
+
+        /* =====================================================
+           ABSENTEE SYSTEM
+        ==================================================== */
+        let currDate = null, currRoom = null, tempAbs = [];
+
+        function expandRolls(rollString) {
+            let rolls = [];
+            if (!rollString) return rolls;
+            rollString.replace(/"/g, '').split(',').forEach(part => {
+                part = part.trim();
+                if (part.includes('-')) {
+                    let [s, e] = part.split('-').map(Number);
+                    if (!isNaN(s) && !isNaN(e)) for (let r = s; r <= e; r++) rolls.push(r.toString());
+                } else if (part) rolls.push(part);
+            });
+            return [...new Set(rolls)].sort((a,b) => parseInt(a) - parseInt(b));
+        }
+
+        function openAbsenteeModal(date, roomId) {
+            currDate = date; currRoom = roomId;
+            if (!absenteesCache[date]) absenteesCache[date] = {};
+            tempAbs = [...(absenteesCache[date][roomId] || [])];
+            
+            const room = roomConfigsCache.find(r => r.id === roomId);
+            document.getElementById('absenteeModalTitle').innerText = `Room ${room.name} - Absentees`;
+            
+            const grid = document.getElementById('absenteeRollGrid');
+            grid.innerHTML = '';
+            
+            if (!room.classDetails || room.classDetails.length === 0) {
+                grid.innerHTML = '<p class="text-xs text-slate-500 italic">No rolls defined.</p>';
+            } else {
+                room.classDetails.forEach(cls => {
+                    let rArr = expandRolls(cls.rolls);
+                    if(rArr.length > 0) {
+                        let h = `<div class="mb-2"><span class="bg-indigo-100 text-indigo-800 border border-indigo-200 px-2 py-0.5 rounded text-[10px] font-black uppercase">Class ${cls.className}</span></div><div class="flex flex-wrap gap-1.5 mb-4">`;
+                        rArr.forEach(roll => {
+                            let uid = `${cls.className}_${roll}`;
+                            let isAbs = tempAbs.includes(uid);
+                            let btnClass = isAbs ? 'bg-rose-500 text-white border-rose-600 shadow-inner' : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50';
+                            h += `<button onclick="toggleAbsentee('${uid}', this)" class="w-10 h-10 rounded border-2 font-bold text-xs flex justify-center items-center transition-colors shadow-sm ${btnClass}">${roll}</button>`;
+                        });
+                        grid.innerHTML += h + `</div>`;
+                    }
+                });
+            }
+            document.getElementById('absenteeModal').classList.remove('hidden');
+        }
+
+        function toggleAbsentee(uid, btnEl) {
+            const idx = tempAbs.indexOf(uid);
+            if (idx > -1) {
+                tempAbs.splice(idx, 1);
+                btnEl.className = 'w-10 h-10 rounded border-2 font-bold text-xs flex justify-center items-center transition-colors bg-white text-slate-700 border-slate-300 shadow-sm hover:bg-slate-50';
+            } else {
+                tempAbs.push(uid);
+                btnEl.className = 'w-10 h-10 rounded border-2 font-bold text-xs flex justify-center items-center transition-colors bg-rose-500 text-white border-rose-600 shadow-inner';
+            }
+        }
+
+        async function saveAbsentees() {
+            absenteesCache[currDate][currRoom] = [...tempAbs];
+            await saveToDB('absentees', absenteesCache, 'absentees');
+            closeModal('absenteeModal');
+            renderDutyGrid();
+        }
+
+        function closeModal(modalId) { document.getElementById(modalId).classList.add('hidden'); }
+
+        /* =====================================================
+           PRINT: DYNAMIC ROOM SHEETS (ALL SUBJECTS)
+        ==================================================== */
+        /* =====================================================
+           PRINT: DYNAMIC ROOM SHEETS (ALL SUBJECTS)
+        ==================================================== */
+        function openRoomPrintModal() {
+            const selectEl = document.getElementById('printRoomSelect');
+            // Added "All Rooms" option
+            selectEl.innerHTML = '<option value="">-- Select a Room --</option><option value="ALL">All Rooms (Bulk Print)</option>';
+            roomConfigsCache.forEach(room => {
+                selectEl.innerHTML += `<option value="${room.id}">Room ${room.name} (${room.gender})</option>`;
+            });
+            document.getElementById('printClassCheckboxes').innerHTML = '<p class="text-xs text-slate-400 italic">Select a room first.</p>';
+            document.getElementById('roomPrintModal').classList.remove('hidden');
+        }
+
+        function populateRoomClasses() {
+            const roomId = document.getElementById('printRoomSelect').value;
+            const container = document.getElementById('printClassCheckboxes');
+            if(!roomId) { container.innerHTML = '<p class="text-xs text-slate-400 italic">Select a room first.</p>'; return; }
+
+            let classes = new Set();
+            if (roomId === 'ALL') {
+                // If ALL rooms, gather every unique class in the school
+                roomConfigsCache.forEach(r => r.classesList.forEach(c => classes.add(c)));
+            } else {
+                const room = roomConfigsCache.find(r => r.id === roomId);
+                if(room) room.classesList.forEach(c => classes.add(c));
+            }
+
+            let html = '';
+            Array.from(classes).sort().forEach(cls => {
+                html += `<label class="flex items-center gap-2 text-sm font-bold text-slate-700 cursor-pointer p-1 hover:bg-indigo-50 rounded transition-colors"><input type="checkbox" value="${cls}" checked class="print-class-chk w-4 h-4 text-indigo-600 rounded"> Class ${cls}</label>`;
+            });
+            container.innerHTML = html;
+        }
+
+        
+
+/* =====================================================
+           PRINT: DYNAMIC ROOM SHEETS (PROFESSIONAL & DATE SORTED)
+        ==================================================== */
+        function executeRoomPrint() {
+            const roomId = document.getElementById('printRoomSelect').value;
+            if(!roomId) return alert("Select a room.");
+            
+            const checkedClasses = Array.from(document.querySelectorAll('.print-class-chk:checked')).map(cb => cb.value);
+            if(checkedClasses.length === 0) return alert("Select at least one class.");
+
+            let roomsToPrint = roomId === 'ALL' ? roomConfigsCache : [roomConfigsCache.find(r => r.id === roomId)];
+
+            let fullHtml = `<html><head><title>Room Attendance Sheets</title><style>
+                @page { size: A4 portrait; margin: 15mm; }
+                body { font-family: 'Segoe UI', 'Helvetica Neue', sans-serif; margin:0; padding:0; color: #000; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+                .page-break { page-break-after: always; padding-bottom: 20px; }
+                .page-break:last-child { page-break-after: auto; }
+                .header-container { display: flex; align-items: center; justify-content: space-between; border-bottom: 3px solid #3f51b5; padding-bottom: 10px; margin-bottom: 15px; }
+                .header-text { text-align: center; flex-grow: 1; }
+                .header-text h2 { margin: 0; font-size: 26px; text-transform: uppercase; font-weight: 900; letter-spacing: 1px; color: #3f51b5; }
+                .header-text h3 { margin: 5px 0 0 0; font-size: 16px; font-weight: bold; text-decoration: underline; color: #333; }
+                .meta { display: flex; justify-content: space-between; font-weight: bold; margin-bottom: 15px; font-size: 15px; background: #f8f9fa; padding: 12px 15px; border: 1px solid #e0e0e0; border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);}
+                table { width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+                th, td { border: 1px solid #333; padding: 10px 6px; text-align: center; vertical-align: middle; }
+                th { background: #e0e0e0 !important; font-weight: 900; text-transform: uppercase; font-size: 13px; letter-spacing: 0.5px; }
+                .allotment { text-align: left; font-size: 12px; line-height: 1.5; }
+                .subject-cell { text-align: left; font-weight: bold; font-size: 13px; line-height: 1.4; color: #d32f2f; }
+                .signatures { margin-top: 50px; display: flex; justify-content: space-between; font-weight: bold; padding: 0 30px; font-size: 15px; }
+                .signatures div { border-top: 1px dashed #000; padding-top: 8px; width: 220px; text-align: center; color: #333; }
+                @media print { .no-print { display: none !important; } }
+            </style></head><body>
+            <button class="no-print" onclick="window.print()" style="position:fixed; bottom:20px; right:20px; padding:15px 25px; background:#3f51b5; color:white; font-size:16px; font-weight:bold; border:none; border-radius:5px; cursor:pointer; box-shadow:0 4px 6px rgba(0,0,0,0.3); z-index: 1000;">🖨️ Print Sheets</button>
+            `;
+
+            let pagesAdded = 0;
+
+            roomsToPrint.forEach(room => {
+                let roomClassesToPrint = room.classDetails.filter(c => checkedClasses.includes(c.className));
+                if(roomClassesToPrint.length === 0) return; 
+
+                let roomClassNames = roomClassesToPrint.map(c => c.className);
+
+                let relevantSchedules = scheduleCache.filter(s => {
+                    let sClasses = s.classes.split(/[\s,;]+/).filter(Boolean);
+                    return sClasses.some(sc => roomClassNames.includes(sc));
+                });
+
+                if(relevantSchedules.length === 0) return;
+
+                let groupedSched = {};
+                relevantSchedules.forEach(s => {
+                    let key = s.date + '|' + s.time;
+                    if(!groupedSched[key]) {
+                        groupedSched[key] = { date: s.date, time: s.time, exams: [] };
+                    }
+                    
+                    let sClasses = s.classes.split(/[\s,;]+/).filter(Boolean);
+                    let overlapping = sClasses.filter(sc => roomClassNames.includes(sc));
+                    if(overlapping.length > 0) {
+                        groupedSched[key].exams.push(`<b style="color:#000;">${overlapping.join(', ')}</b> - ${s.subject}`);
+                    }
+                });
+
+                // PROPER ASCENDING DATE SORTING (using real Date math)
+                let sortedGroups = Object.values(groupedSched).sort((a,b) => {
+                    let dateA = new Date(a.date);
+                    let dateB = new Date(b.date);
+                    if (dateA.getTime() !== dateB.getTime()) {
+                        return dateA - dateB; // Ascending chronologically
+                    }
+                    return a.time.localeCompare(b.time); // Ascending time on same day
+                });
+
+                let allotmentStr = roomClassesToPrint.map(c => `<span style="color:#555;"><b>${c.className}:</b></span> ${c.rolls}`).join('<br>');
+
+                fullHtml += `
+                    <div class="page-break">
+                        <div class="header-container">
+                            <img src="https://raw.githubusercontent.com/mrinmoyedebnath-sys/mylogo/main/STH.png" crossorigin="anonymous" style="width:75px; height:75px; object-fit:contain;">
+                            <div class="header-text">
+                                <h2>${savedSchoolName}</h2>
+                                <h3>EXAM ATTENDANCE & ROOM SHEET</h3>
+                            </div>
+                            <img src="https://raw.githubusercontent.com/mrinmoyedebnath-sys/mylogo/main/STH.png" crossorigin="anonymous" style="width:75px; height:75px; object-fit:contain;">
+                        </div>
+                        <div class="meta">
+                            <div><span style="color:#777; font-weight:normal;">Room:</span> <span style="font-size:20px; color:#d32f2f;">${room.name}</span> <span style="font-size:12px; font-weight:normal; color:#555;">(${room.gender})</span></div>
+                            <div style="text-align:right;"><span style="color:#777; font-weight:normal;">Classes Allotted:</span><br><span style="font-size:16px;">${roomClassNames.join(', ')}</span></div>
+                        </div>
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th style="width:5%">Sl</th>
+                                    <th style="width:13%">Date</th>
+                                    <th style="width:10%">Time</th>
+                                    <th style="width:28%">Class & Subject</th>
+                                    <th style="width:15%">Allotment</th>
+                                    <th style="width:17%">Absentee Roll Nos.<br><span style="font-size:9px; font-weight:normal;">(Write Below)</span></th>
+                                    <th style="width:12%">Invigilator<br>Signature</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                `;
+
+                sortedGroups.forEach((g, idx) => {
+                    let displayDate = g.date.split('-').reverse().join('-');
+                    let uniqueExams = [...new Set(g.exams)].join('<div style="border-top:1px dashed #ccc; margin:4px 0;"></div>');
+                    
+                    fullHtml += `
+                        <tr>
+                            <td style="font-weight:900; font-size:15px; background:#f8f9fa;">${idx + 1}</td>
+                            <td style="font-weight:bold; font-size:14px;">${displayDate}</td>
+                            <td style="font-weight:bold; font-size:13px;">${g.time}</td>
+                            <td class="subject-cell">${uniqueExams}</td>
+                            <td class="allotment">${allotmentStr}</td>
+                            <td style="height: 55px;"></td>
+                            <td></td>
+                        </tr>
+                    `;
+                });
+
+                fullHtml += `</tbody></table>
+                    <div class="signatures">
+                        <div>Signature of Exam In-Charge</div>
+                        <div>Signature of Center Supt.</div>
+                    </div>
+                </div>`;
+                
+                pagesAdded++;
+            });
+
+            fullHtml += `</body></html>`;
+
+            if(pagesAdded === 0) return alert("No schedule data found for the selected criteria.");
+
+            const w = window.open('', '_blank');
+            w.document.write(fullHtml);
+            w.document.close();
+            closeModal('roomPrintModal');
+            setTimeout(() => { w.print(); }, 800);
+        }
+
+
+        /* =====================================================
+           PRINT: BEAUTIFUL DUTY ROSTER WITH RESERVE STAFF
+        ==================================================== */
+        function printDutyRoster() {
+            const date = document.getElementById('activeDate').value;
+            if(!date) return alert("Select a date to print the roster.");
+            if(!dutyRecordsCache[date]) return alert("No duties configured for this date.");
+
+            const dayRecord = dutyRecordsCache[date];
+            let displayDate = date.split('-').reverse().join('-');
+
+            const assignedStaff = new Set();
+            Object.values(dayRecord).forEach(room => {
+                if(room.invigs) room.invigs.forEach(i => { if(i) assignedStaff.add(i); });
+            });
+
+            // Calculate excluded for display
+            const excludedStaff = new Set(dutyRecordsCache[date].excluded || []);
+            
+            const remainingStaff = teachersCache.filter(t => !assignedStaff.has(t) && !excludedStaff.has(t));
+
+            const w = window.open('', '_blank');
+            let html = `<html><head><title>Duty Roster - ${displayDate}</title><style>
+                @page { size: A4 portrait; margin: 15mm; }
+                body { font-family: 'Segoe UI', 'Helvetica Neue', sans-serif; margin:0; padding:0; color: #000; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+                .header-box { border-bottom: 4px solid #3f51b5; padding-bottom: 15px; margin-bottom: 20px; text-align: center; }
+                h1 { margin: 0; font-size: 28px; text-transform: uppercase; color: #3f51b5; font-weight: 900; }
+                h2 { margin: 5px 0 0 0; font-size: 20px; text-decoration: underline; }
+                .meta-bar { display: inline-block; background: #e8eaf6; padding: 8px 20px; border-radius: 20px; font-weight: bold; font-size: 16px; margin-top: 10px; border: 1px solid #c5cae9; color: #333; }
+                
+                table { width: 100%; border-collapse: collapse; margin-bottom: 25px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+                th, td { border: 1px solid #b0bec5; padding: 12px; text-align: center; vertical-align: middle; }
+                th { background: #3f51b5; color: white; font-size: 16px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; }
+                tr:nth-child(even) { background-color: #f8f9fa; }
+                
+                .reserve-box { background-color: #fff8e1; border: 2px dashed #ff9800; padding: 15px; border-radius: 8px; margin-top: 10px; page-break-inside: avoid; }
+                .reserve-title { margin: 0 0 10px 0; font-size: 18px; color: #e91e63; font-weight: 900; }
+                .reserve-list { margin: 0; font-size: 16px; line-height: 1.6; font-weight: bold; color: #333; }
+                
+                .footer { margin-top: 50px; display: flex; justify-content: space-between; font-weight: bold; padding: 0 20px; font-size: 16px; page-break-inside: avoid;}
+            </style></head><body>
+                <div class="header-box">
+                    <h1>${savedSchoolName}</h1>
+                    <h2>DAILY EXAM DUTY ROSTER</h2>
+                    <div class="meta-bar">Date: <span style="color:#e91e63;">${displayDate}</span></div>
+                </div>
+
+                <table>
+                    <thead>
+                        <tr>
+                            <th style="width: 25%">Room Details</th>
+                            <th style="width: 25%">Invigilator 1</th>
+                            <th style="width: 25%">Invigilator 2</th>
+                            <th style="width: 25%">Invigilator 3</th>
+                        </tr>
+                    </thead>
+                    <tbody>`;
+
+            roomConfigsCache.forEach(room => {
+                let rDuty = dayRecord[room.id] || { invigs: [] };
+                let inv1 = rDuty.invigs[0] || '-';
+                let inv2 = rDuty.invigs[1] || '-';
+                let inv3 = rDuty.invigs[2] || '-';
+                
+                html += `
+                    <tr>
+                        <td style="font-size: 18px; font-weight: 900; color: #222;">
+                            Room ${room.name} <br>
+                            <span style="font-size: 12px; font-weight: normal; color: #666;">(${room.gender} | Cap: ${room.totalCapacity})</span>
+                        </td>
+                        <td style="font-size: 16px; font-weight: bold;">${inv1}</td>
+                        <td style="font-size: 16px; font-weight: bold;">${inv2}</td>
+                        <td style="font-size: 16px; font-weight: bold;">${inv3}</td>
+                    </tr>`;
+            });
+
+            html += `</tbody></table>
+                <div class="reserve-box">
+                    <h3 class="reserve-title">👨‍🏫 Remaining / Reserve Staff:</h3>
+                    <p class="reserve-list">
+                        ${remainingStaff.length > 0 ? remainingStaff.join(', ') : '<span style="color:#4CAF50;">All available staff assigned!</span>'}
+                    </p>
+                </div>`;
+            
+            if(excludedStaff.size > 0) {
+                html += `<div style="margin-top:15px; font-size:12px; color:#555; font-style:italic;">* Excluded/On-Leave Staff: ${Array.from(excludedStaff).join(', ')}</div>`;
+            }
+
+            html += `<div class="footer">
+                    <div>Exam Convenor</div>
+                    <div>Head of Institution</div>
+                </div>
+            </body></html>`;
+
+            w.document.write(html);
+            w.document.close();
+            setTimeout(() => { w.print(); }, 500);
+        }
+
+        /* =====================================================
+           CSV PARSERS
+        ==================================================== */
+        async function processCSV(type) {
+            let fileId = type === 'rooms' ? 'csvRooms' : (type === 'schedule' ? 'csvSchedule' : 'csvStaff');
+            const file = document.getElementById(fileId).files[0];
+            if (!file) return alert(`Select ${type} CSV.`);
+            
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+                const rows = e.target.result.split('\n');
+                const delimiter = rows[0].includes('\t') ? '\t' : ',';
+                let payload = [];
+
+                if (type === 'staff') {
+                    rows.forEach(r => { let name = r.trim().replace(/"/g, ''); if(name) payload.push(name); });
+                    if(payload.length > 0) {
+                        teachersCache = payload;
+                        await saveToDB('teachers', teachersCache, 'teachers');
+                        alert("Staff imported successfully.");
+                    }
+                } else if (type === 'rooms') {
+                    let roomsMap = {};
+                    for(let i=1; i<rows.length; i++) {
+                        let cols = rows[i].split(delimiter);
+                        if (cols.length >= 5 && cols[0].trim() !== '') {
+                            let rId = cols[0].trim().replace(/"/g, '');
+                            let rName = cols[1].trim().replace(/"/g, '');
+                            let rGender = cols[2].trim().replace(/"/g, '');
+                            let rClass = cols[3].trim().replace(/"/g, '');
+                            let rawRolls = cols.slice(4, cols.length-1).join(',').trim().replace(/"/g, '');
+                            let rCapStr = cols[cols.length-1].trim().replace(/"/g, '');
+                            let rCap = parseInt(rCapStr, 10);
+
+                            if(!roomsMap[rId]) roomsMap[rId] = { id: rId, name: rName, gender: rGender, classesList: [], classDetails: [], totalCapacity: 0 };
+                            roomsMap[rId].classesList.push(rClass);
+                            roomsMap[rId].classDetails.push({ className: rClass, rolls: rawRolls, capacity: isNaN(rCap) ? 0 : rCap });
+                            roomsMap[rId].totalCapacity += isNaN(rCap) ? 0 : rCap;
+                        }
+                    }
+                    payload = Object.values(roomsMap);
+                    if(payload.length > 0) {
+                        roomConfigsCache = payload;
+                        await saveToDB('roomConfigs', roomConfigsCache, 'rooms');
+                        alert("Rooms imported successfully.");
+                    }
+                } else if (type === 'schedule') {
+                    for(let i=1; i<rows.length; i++) {
+                        let cols = rows[i].split(',');
+                        if (cols.length >= 5 && cols[0].trim() !== '') {
+                            payload.push({ id: 'S'+Date.now()+i, date: cols[0].trim(), time: cols[1].trim(), classes: cols[2].trim(), subject: cols[3].trim(), examName: cols[4].trim().replace(/\r/g, '') });
+                        }
+                    }
+                    if(payload.length > 0) {
+                        scheduleCache = payload;
+                        await saveToDB('schedule', scheduleCache, 'schedule');
+                        alert("Schedule imported successfully.");
+                    }
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        async function saveToDB(key, payload, type) {
+            const numId = parseInt(globalSchoolId, 10);
+            if (recordIds[type]) await dbClient.from('exam_db').update({ json_payload: payload }).eq('id', recordIds[type]);
+            else {
+                const { data } = await dbClient.from('exam_db').insert({ data_key: key, json_payload: payload, school_id: numId }).select();
+                if(data) recordIds[type] = data[0].id;
+            }
+        }
+
+
+        function printRoomStickers() {
+            const checkedIds = Array.from(document.querySelectorAll('.sticker-room-chk:checked')).map(cb => cb.value);
+            if (checkedIds.length === 0) return alert("Select at least one room to print.");
+
+            let roomsToPrint = roomConfigsCache.filter(r => checkedIds.includes(r.id));
+            let savedSchoolName = sessionStorage.getItem('schoolName') || localStorage.getItem('schoolName') || 'Exam Center';
+
+            let fullHtml = `<html><head><title>Room Stickers</title><style>
+                @page { size: A4 landscape; margin: 10mm; }
+                body { font-family: 'Segoe UI', Arial, sans-serif; margin:0; padding:0; color: #000; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+                
+                /* EXACT A4 LANDSCAPE HEIGHT MINUS MARGINS */
+                .sticker-container { width: 100%; height: 185mm; display: flex; flex-direction: column; justify-content: center; align-items: center; page-break-after: always; padding: 15px; box-sizing: border-box; text-align: center; border: 8px solid #000; border-radius: 15px; position: relative; overflow: hidden; }
+                .sticker-container:last-child { page-break-after: auto; }
+                
+                .school-name { font-size: 42px; font-weight: 900; text-transform: uppercase; margin-bottom: 5px; padding-bottom: 10px; border-bottom: 4px solid #000; width: 90%; letter-spacing: 2px; line-height: 1.1; }
+                .room-label { font-size: 24px; font-weight: bold; color: #555; margin-top: 10px; text-transform: uppercase; letter-spacing: 4px; }
+                .room-name { font-size: 115px; font-weight: 900; margin: 0 0 10px 0; color: #000; text-transform: uppercase; letter-spacing: 5px; text-shadow: 3px 3px 0px rgba(0,0,0,0.1); line-height: 1; }
+                
+                .details-table { width: 90%; border-collapse: collapse; margin-top: 10px; font-size: 28px; font-weight: bold; }
+                .details-table th, .details-table td { border: 3px solid #000; padding: 10px 15px; text-align: center; }
+                .details-table th { background: #e0e0e0 !important; text-transform: uppercase; color: #000; }
+                
+                .footer-meta { position: absolute; bottom: 15px; width: 90%; display: flex; justify-content: space-between; font-size: 20px; font-weight: bold; color: #333; }
+            </style></head><body>`;
+
+            roomsToPrint.forEach(room => {
+                let classRows = '';
+                
+                let detailsToPrint = room.classDetails || [];
+                if (detailsToPrint.length === 0 && room.classesList) {
+                     detailsToPrint = room.classesList.map(c => ({ className: c, rolls: "1-40", capacity: room.totalCapacity || 40 }));
+                }
+
+                if (detailsToPrint.length > 0) {
+                    detailsToPrint.forEach(c => {
+                        classRows += `<tr>
+                            <td>${c.className}</td>
+                            <td style="color:#d32f2f;">${c.rolls}</td>
+                            <td>${c.capacity}</td>
+                        </tr>`;
+                    });
+                } else {
+                    classRows = `<tr><td colspan="3">No Seat Configuration Available</td></tr>`;
+                }
+
+                fullHtml += `
+                    <div class="sticker-container">
+                        <div class="school-name">${savedSchoolName}</div>
+                        <div class="room-label">Seating Arrangement</div>
+                        <div class="room-name">${room.name}</div>
+                        
+                        <table class="details-table">
+                            <thead>
+                                <tr>
+                                    <th style="width:25%">Class</th>
+                                    <th style="width:50%">Roll Numbers</th>
+                                    <th style="width:25%">Total</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${classRows}
+                            </tbody>
+                        </table>
+                        
+                        <div class="footer-meta">
+                            <div>Type: ${room.gender.toUpperCase()}</div>
+                            <div>Max Capacity: ${room.totalCapacity}</div>
+                        </div>
+                    </div>
+                `;
+            });
+
+            fullHtml += `</body></html>`;
+
+            const w = window.open('', '_blank');
+            w.document.write(fullHtml);
+            w.document.close();
+            setTimeout(() => { w.print(); }, 800);
+        }
+
+        /* =====================================================
+           ROOM STICKERS VIEW
+        ==================================================== */
+        function renderRoomStickers(workspace) {
+            if (!roomConfigsCache || roomConfigsCache.length === 0) {
+                workspace.innerHTML = '<p class="text-slate-500 italic text-center py-10 font-bold">No rooms synchronized yet. Please setup rooms via CSV first.</p>';
+                return;
+            }
+
+            let roomCheckboxes = roomConfigsCache.map((r, idx) => `
+                <label class="flex items-center gap-3 p-3 bg-white border border-slate-200 rounded-lg shadow-sm cursor-pointer hover:bg-pink-50 hover:border-pink-300 transition-colors">
+                    <input type="checkbox" value="${r.id}" class="sticker-room-chk w-5 h-5 text-pink-600 rounded focus:ring-pink-500" checked>
+                    <div>
+                        <div class="font-black text-slate-800 text-base leading-tight">${r.name}</div>
+                        <div class="text-xs text-slate-500 font-bold mt-0.5">Classes: ${r.classesList ? r.classesList.join(', ') : 'None'}</div>
+                    </div>
+                </label>
+            `).join('');
+
+            workspace.innerHTML = `
+                <div class="max-w-5xl mx-auto bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+                    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 border-b pb-4 gap-4">
+                        <div>
+                            <h2 class="font-black text-slate-800 text-xl flex items-center"><i class="fas fa-tags mr-2 text-pink-500"></i> Room Door Stickers</h2>
+                            <p class="text-xs text-slate-500 font-bold mt-1">Select rooms to generate printable A4 landscape door signs.</p>
+                        </div>
+                        <button onclick="printRoomStickers()" class="bg-pink-600 hover:bg-pink-700 text-white font-black px-6 py-2.5 rounded shadow-md transition-colors flex items-center">
+                            <i class="fas fa-print mr-2"></i> Print Selected
+                        </button>
+                    </div>
+                    
+                    <div class="mb-4 flex gap-4 bg-slate-50 p-2 rounded border border-slate-200 w-max">
+                        <button onclick="document.querySelectorAll('.sticker-room-chk').forEach(cb => cb.checked = true)" class="text-xs font-bold text-indigo-600 hover:underline"><i class="fas fa-check-square mr-1"></i> Select All</button>
+                        <span class="text-slate-300">|</span>
+                        <button onclick="document.querySelectorAll('.sticker-room-chk').forEach(cb => cb.checked = false)" class="text-xs font-bold text-slate-500 hover:underline"><i class="far fa-square mr-1"></i> Deselect All</button>
+                    </div>
+                    
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                        ${roomCheckboxes}
+                    </div>
+                </div>
+            `;
+        }
     </script>
 </body>
 </html>
