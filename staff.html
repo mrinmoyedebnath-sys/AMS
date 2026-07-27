@@ -255,22 +255,26 @@
                 </div>
 
 <!-- STUDENT CHECKER -->
+<!-- STUDENT CHECKER -->
                 <div class="bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden shrink-0 mb-4">
                     <div class="bg-cyan-50 p-2 md:p-3 border-b border-cyan-200 shrink-0 flex items-center">
                         <i class="fas fa-search text-cyan-600 mr-1.5"></i>
                         <h3 class="font-bold text-cyan-900 text-[11px] md:text-sm uppercase">Student Checker</h3>
                     </div>
                     <div class="p-3 flex flex-col gap-2">
-                        <input type="date" id="checkStudDate" class="w-full border border-slate-300 p-1.5 rounded text-[10px] md:text-xs outline-none focus:border-cyan-500 bg-slate-50">
+                        <select id="checkStudDate" class="w-full border border-slate-300 p-1.5 rounded text-[10px] md:text-xs outline-none focus:border-cyan-500 bg-slate-50 font-bold text-slate-700">
+                            <option value="">-- Select Date --</option>
+                        </select>
                         <div class="flex gap-2">
-                            <input type="text" id="checkStudClass" placeholder="Class (e.g. V-A)" class="w-1/2 border border-slate-300 p-1.5 rounded text-[10px] md:text-xs outline-none focus:border-cyan-500 bg-slate-50 uppercase">
-                            <input type="number" id="checkStudRoll" placeholder="Roll No" class="w-1/2 border border-slate-300 p-1.5 rounded text-[10px] md:text-xs outline-none focus:border-cyan-500 bg-slate-50">
+                            <select id="checkStudClass" class="w-1/2 border border-slate-300 p-1.5 rounded text-[10px] md:text-xs outline-none focus:border-cyan-500 bg-slate-50 font-bold text-slate-700">
+                                <option value="">-- Class --</option>
+                            </select>
+                            <input type="number" id="checkStudRoll" placeholder="Roll No" class="w-1/2 border border-slate-300 p-1.5 rounded text-[10px] md:text-xs outline-none focus:border-cyan-500 bg-slate-50 font-bold text-slate-700">
                         </div>
                         <button onclick="checkStudentStatus()" class="w-full bg-cyan-600 hover:bg-cyan-700 text-white font-bold py-1.5 rounded shadow transition-colors text-[10px] md:text-xs mt-1">Check Status</button>
                         <div id="checkStudResult" class="hidden mt-2 p-2 rounded border text-[10px] md:text-xs text-center flex flex-col gap-1 leading-tight"></div>
                     </div>
                 </div>
-
                 
                 <!-- LEAVE APPLICATION -->
                 <div class="bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden shrink-0">
@@ -614,6 +618,8 @@ if (keyStr === 'dutyRecords') {
                 calculateAndRenderLeaveBalances();
                 renderNoticeBoard();
 
+                populateStudentCheckerDropdowns();
+
                 myAllExtraClasses = allAssignments.filter(duty => {
                     const subClean = sanitizeName(duty.substituteTeacher);
                     const absClean = sanitizeName(duty.absentTeacher);
@@ -647,22 +653,26 @@ if (keyStr === 'dutyRecords') {
         /* =====================================================
            EXAM DUTIES RENDERING (WITH DYNAMIC SCHEDULE FIX)
         ===================================================== */
+       /* =====================================================
+           EXAM DUTIES RENDERING (WITH DYNAMIC SCHEDULE FIX)
+        ===================================================== */
         function getExamDetailsForRoom(date, roomConf) {
             let defaultMeta = { time: 'N/A', examName: 'Examination', subject: 'N/A' };
             if(!roomConf || !roomConf.classesList || scheduleCache.length === 0) return defaultMeta;
             
             let todaysSchedules = scheduleCache.filter(s => s.date === date);
-            let matchingSched = todaysSchedules.find(s => {
-                let sClasses = s.classes.split(/[\s,;]+/).filter(Boolean);
-                return sClasses.some(c => roomConf.classesList.includes(c));
+            
+            // Smarter matching: Combine all subjects that are happening in this room
+            let matchingScheds = todaysSchedules.filter(s => {
+                let sClasses = s.classes.split(/[\s,;]+/).filter(Boolean).map(c => c.trim().toUpperCase());
+                return sClasses.some(c => roomConf.classesList.map(rc => rc.trim().toUpperCase()).includes(c));
             });
             
-            if(matchingSched) {
-                return {
-                    time: matchingSched.time || 'N/A',
-                    examName: matchingSched.examName || 'Examination',
-                    subject: matchingSched.subject || 'N/A'
-                };
+            if(matchingScheds.length > 0) {
+                let times = [...new Set(matchingScheds.map(s => s.time))].join(' & ');
+                let examNames = [...new Set(matchingScheds.map(s => s.examName))].join(' / ');
+                let subjects = [...new Set(matchingScheds.map(s => s.subject))].join(' + ');
+                return { time: times, examName: examNames, subject: subjects };
             }
             return defaultMeta;
         }
@@ -676,11 +686,13 @@ if (keyStr === 'dutyRecords') {
             const staffClean = sanitizeName(currentStaffName);
 
             Object.keys(dutyRecordsCache).forEach(date => {
+                // Safety check to ignore root-level metadata keys
+                if (date === 'meta' || date === 'excluded') return; 
+
                 const dayRec = dutyRecordsCache[date];
                 const meta = dayRec.meta || {};
                 const isLocked = meta.isLocked === true || meta.isLocked === "true";
                 
-                // Helper to process a room's assignment
                 const processAssignment = (roomRef, invigs) => {
                     if (invigs.some(inv => sanitizeName(inv) === staffClean)) {
                         const roomConf = roomConfigsCache.find(rc => rc.id === roomRef || rc.name === roomRef);
@@ -731,7 +743,6 @@ if (keyStr === 'dutyRecords') {
             myDuties.forEach(duty => {
                 const displayDate = duty.date.split('-').reverse().join('-');
                 
-                // Ensure safe object checking
                 let safeAbsData = absenteesCache[duty.date] || {};
                 if(Array.isArray(safeAbsData)) safeAbsData = safeAbsData[0] || {};
                 
@@ -1472,6 +1483,21 @@ if (keyStr === 'dutyRecords') {
             modal.classList.remove('hidden');
         }
 
+
+        function populateStudentCheckerDropdowns() {
+            const dateSelect = document.getElementById('checkStudDate');
+            const classSelect = document.getElementById('checkStudClass');
+            if(!dateSelect || !classSelect) return;
+
+            let uniqueDates = [...new Set(scheduleCache.map(s => s.date))].sort((a,b) => new Date(a) - new Date(b));
+            let dateOptions = '<option value="">-- Select Date --</option>' + uniqueDates.map(d => `<option value="${d}">${d.split('-').reverse().join('-')}</option>`).join('');
+            dateSelect.innerHTML = dateOptions;
+
+            let allClasses = new Set();
+            roomConfigsCache.forEach(r => r.classesList.forEach(c => allClasses.add(c)));
+            let classOptions = '<option value="">-- Class --</option>' + Array.from(allClasses).sort().map(c => `<option value="${c}">${c}</option>`).join('');
+            classSelect.innerHTML = classOptions;
+        }
         /* =====================================================
            STUDENT CHECKER LOGIC
         ===================================================== */
