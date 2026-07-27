@@ -254,6 +254,24 @@
                     </div>
                 </div>
 
+<!-- STUDENT CHECKER -->
+                <div class="bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden shrink-0 mb-4">
+                    <div class="bg-cyan-50 p-2 md:p-3 border-b border-cyan-200 shrink-0 flex items-center">
+                        <i class="fas fa-search text-cyan-600 mr-1.5"></i>
+                        <h3 class="font-bold text-cyan-900 text-[11px] md:text-sm uppercase">Student Checker</h3>
+                    </div>
+                    <div class="p-3 flex flex-col gap-2">
+                        <input type="date" id="checkStudDate" class="w-full border border-slate-300 p-1.5 rounded text-[10px] md:text-xs outline-none focus:border-cyan-500 bg-slate-50">
+                        <div class="flex gap-2">
+                            <input type="text" id="checkStudClass" placeholder="Class (e.g. V-A)" class="w-1/2 border border-slate-300 p-1.5 rounded text-[10px] md:text-xs outline-none focus:border-cyan-500 bg-slate-50 uppercase">
+                            <input type="number" id="checkStudRoll" placeholder="Roll No" class="w-1/2 border border-slate-300 p-1.5 rounded text-[10px] md:text-xs outline-none focus:border-cyan-500 bg-slate-50">
+                        </div>
+                        <button onclick="checkStudentStatus()" class="w-full bg-cyan-600 hover:bg-cyan-700 text-white font-bold py-1.5 rounded shadow transition-colors text-[10px] md:text-xs mt-1">Check Status</button>
+                        <div id="checkStudResult" class="hidden mt-2 p-2 rounded border text-[10px] md:text-xs text-center flex flex-col gap-1 leading-tight"></div>
+                    </div>
+                </div>
+
+                
                 <!-- LEAVE APPLICATION -->
                 <div class="bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden shrink-0">
                     <div class="bg-slate-50 p-2 md:p-3 border-b border-slate-200 shrink-0 flex justify-between items-center">
@@ -573,10 +591,18 @@
 
                         // 5. Fetch Exam Infrastructure
                         if (keyStr === 'roomConfigs') roomConfigsCache = Array.isArray(payload) ? payload : Object.values(payload || {});
-                        if (keyStr === 'dutyRecords') dutyRecordsCache = payload || {};
+if (keyStr === 'dutyRecords') {
+                            // SANITIZE: Unwrap array if it was saved incorrectly in the past
+                            if (Array.isArray(payload)) dutyRecordsCache = payload[0] || {};
+                            else dutyRecordsCache = payload || {};
+                        }
+
+                        
                         if (keyStr === 'schedule') scheduleCache = Array.isArray(payload) ? payload : Object.values(payload || {}); // <--- NEW: FETCHES SCHEDULE
-                        if (keyStr === 'absentees') {
-                            absenteesCache = payload || {};
+                       if (keyStr === 'absentees') {
+                            // SANITIZE: Unwrap array if it was saved incorrectly in the past
+                            if (Array.isArray(payload)) absenteesCache = payload[0] || {};
+                            else absenteesCache = payload || {};
                             recordIds.absentees = row.id;
                         }
                     });
@@ -618,6 +644,29 @@
         /* =====================================================
            EXAM DUTIES RENDERING
         ===================================================== */
+        /* =====================================================
+           EXAM DUTIES RENDERING (WITH DYNAMIC SCHEDULE FIX)
+        ===================================================== */
+        function getExamDetailsForRoom(date, roomConf) {
+            let defaultMeta = { time: 'N/A', examName: 'Examination', subject: 'N/A' };
+            if(!roomConf || !roomConf.classesList || scheduleCache.length === 0) return defaultMeta;
+            
+            let todaysSchedules = scheduleCache.filter(s => s.date === date);
+            let matchingSched = todaysSchedules.find(s => {
+                let sClasses = s.classes.split(/[\s,;]+/).filter(Boolean);
+                return sClasses.some(c => roomConf.classesList.includes(c));
+            });
+            
+            if(matchingSched) {
+                return {
+                    time: matchingSched.time || 'N/A',
+                    examName: matchingSched.examName || 'Examination',
+                    subject: matchingSched.subject || 'N/A'
+                };
+            }
+            return defaultMeta;
+        }
+
         function renderExamDuties() {
             const tbody = document.getElementById('examDutiesBody');
             const badge = document.getElementById('examDutiesCountBadge');
@@ -631,44 +680,35 @@
                 const meta = dayRec.meta || {};
                 const isLocked = meta.isLocked === true || meta.isLocked === "true";
                 
+                // Helper to process a room's assignment
+                const processAssignment = (roomRef, invigs) => {
+                    if (invigs.some(inv => sanitizeName(inv) === staffClean)) {
+                        const roomConf = roomConfigsCache.find(rc => rc.id === roomRef || rc.name === roomRef);
+                        const dynamicMeta = getExamDetailsForRoom(date, roomConf);
+                        
+                        myDuties.push({
+                            date: date,
+                            time: dynamicMeta.time,
+                            examName: dynamicMeta.examName,
+                            subject: dynamicMeta.subject,
+                            roomName: roomConf ? roomConf.name : roomRef,
+                            roomId: roomConf ? roomConf.id : roomRef,
+                            allInvigs: invigs.filter(Boolean),
+                            isLocked: isLocked
+                        });
+                    }
+                };
+
                 if(dayRec.rows) {
                     dayRec.rows.forEach(r => {
                         const invigs = r.invigilators || r.invigs || [];
-                        if (invigs.some(inv => sanitizeName(inv) === staffClean)) {
-                            // Find the room name. Duty records might save room as name or id.
-                            const roomConf = roomConfigsCache.find(rc => rc.id === r.room || rc.name === r.room);
-                            
-                            myDuties.push({
-                                date: date,
-                                time: meta.time || 'N/A',
-                                examName: meta.examName || 'Examination',
-                                subject: meta.subjectHeading || 'N/A',
-                                roomName: roomConf ? roomConf.name : r.room,
-                                roomId: roomConf ? roomConf.id : r.room,
-                                allInvigs: invigs.filter(Boolean),
-                                isLocked: isLocked
-                            });
-                        }
+                        processAssignment(r.room, invigs);
                     });
                 } else {
-                    // Alternative data structure support where keys are room IDs
                     Object.keys(dayRec).forEach(roomId => {
                         if (roomId === 'meta' || roomId === 'excluded') return;
-                        const rData = dayRec[roomId];
-                        const invigs = rData.invigilators || rData.invigs || [];
-                        if (invigs.some(inv => sanitizeName(inv) === staffClean)) {
-                            const roomConf = roomConfigsCache.find(rc => rc.id === roomId || rc.name === roomId);
-                            myDuties.push({
-                                date: date,
-                                time: meta.time || 'N/A',
-                                examName: meta.examName || 'Examination',
-                                subject: meta.subjectHeading || 'N/A',
-                                roomName: roomConf ? roomConf.name : roomId,
-                                roomId: roomConf ? roomConf.id : roomId,
-                                allInvigs: invigs.filter(Boolean),
-                                isLocked: isLocked
-                            });
-                        }
+                        const invigs = dayRec[roomId].invigilators || dayRec[roomId].invigs || [];
+                        processAssignment(roomId, invigs);
                     });
                 }
             });
@@ -691,7 +731,11 @@
             myDuties.forEach(duty => {
                 const displayDate = duty.date.split('-').reverse().join('-');
                 
-                const absArr = (absenteesCache[duty.date] && absenteesCache[duty.date][duty.roomId]) ? absenteesCache[duty.date][duty.roomId] : [];
+                // Ensure safe object checking
+                let safeAbsData = absenteesCache[duty.date] || {};
+                if(Array.isArray(safeAbsData)) safeAbsData = safeAbsData[0] || {};
+                
+                const absArr = safeAbsData[duty.roomId] || [];
                 const absCount = absArr.length;
                 const absBadge = absCount > 0 ? `<span class="bg-rose-100 text-rose-800 px-1.5 py-0.5 rounded text-[9px] font-bold mt-1 block w-max mx-auto shadow-sm">Absents Logged: ${absCount}</span>` : '';
 
@@ -733,7 +777,6 @@
             });
             tbody.innerHTML = html;
         }
-
         /* =====================================================
            EXAM ABSENTEE ENTRY MODAL & AUTO-CALCULATOR
         ===================================================== */
@@ -1340,6 +1383,149 @@
             sessionStorage.clear();
             localStorage.clear();
             window.location.href = 'index.html';
+        }
+
+        /* =====================================================
+           MODAL LOGIC (EXTRA CLASSES & PROXY CALCULATION)
+        ===================================================== */
+        function openExtraClassModal() {
+            const modal = document.getElementById('extraClassModal');
+            const tbody = document.getElementById('extraClassModalBody');
+            
+            const startDateStr = document.getElementById('proxyFilterStart').value;
+            const endDateStr = document.getElementById('proxyFilterEnd').value;
+            
+            tbody.innerHTML = '';
+
+            let filteredClasses = [...myAllExtraClasses];
+
+            if (startDateStr && endDateStr) {
+                const filterStart = new Date(startDateStr);
+                const filterEnd = new Date(endDateStr);
+                filteredClasses = filteredClasses.filter(duty => {
+                    const dutyDate = new Date(duty.date);
+                    return (dutyDate >= filterStart && dutyDate <= filterEnd);
+                });
+            }
+
+            if (filteredClasses.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="6" class="p-6 text-slate-400 font-semibold italic text-[10px] md:text-xs">No extra classes found for the selected dates.</td></tr>`;
+            } else {
+                let html = '';
+                const staffClean = sanitizeName(currentStaffName);
+                
+                let proxyCount = 0;
+                let absentCount = 0;
+
+                filteredClasses.forEach(duty => {
+                    let date = duty.date || 'Unknown Date';
+                    let period = duty.period || 'Assigned';
+                    let cls = duty.class || 'N/A';
+                    let subject = duty.subject || '-';
+                    
+                    const subClean = sanitizeName(duty.substituteTeacher);
+                    const absClean = sanitizeName(duty.absentTeacher);
+                    
+                    let roleBadge = '';
+                    let counterpart = '';
+
+                    if (subClean === staffClean) {
+                        proxyCount++;
+                        roleBadge = '<span class="bg-emerald-100 text-emerald-800 border border-emerald-300 px-1.5 py-0.5 rounded text-[9px] font-black uppercase">Substitute</span>';
+                        counterpart = `Covering for: <b>${duty.absentTeacher}</b>`;
+                    } else if (absClean === staffClean) {
+                        absentCount++;
+                        roleBadge = '<span class="bg-red-100 text-red-800 border border-red-300 px-1.5 py-0.5 rounded text-[9px] font-black uppercase">Absent</span>';
+                        counterpart = `Covered by: <b>${duty.substituteTeacher}</b>`;
+                    }
+
+                    const today = new Date();
+                    const todayISO = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+                    const isToday = (date === todayISO);
+                    
+                    const rowClass = isToday ? 'bg-amber-50 hover:bg-amber-100 font-bold border-l-4 border-l-amber-500' : 'hover:bg-slate-50';
+
+                    html += `
+                        <tr class="border-b border-slate-200 transition-colors ${rowClass}">
+                            <td class="p-2 text-slate-700 whitespace-nowrap">${date} ${isToday ? '<span class="ml-1 text-[8px] bg-amber-500 text-white px-1 py-0.5 rounded">Today</span>' : ''}</td>
+                            <td class="p-2">${roleBadge}</td>
+                            <td class="p-2 text-blue-900 font-bold">${period}</td>
+                            <td class="p-2 text-slate-900 font-black whitespace-nowrap">Class ${cls}</td>
+                            <td class="p-2 text-slate-600">${subject}</td>
+                            <td class="p-2 text-slate-600 text-[10px] md:text-xs">${counterpart}</td>
+                        </tr>
+                    `;
+                });
+                
+                // Add the calculation banner at the top of the table
+                html = `
+                    <tr class="bg-blue-100">
+                        <td colspan="6" class="p-2 text-center text-[10px] md:text-xs font-black text-blue-900 border-b border-blue-300 shadow-sm">
+                            <span class="mr-4"><i class="fas fa-check-circle text-emerald-600 mr-1"></i> Total Proxies Undertaken: <span class="text-emerald-700 text-sm">${proxyCount}</span></span>
+                            <span><i class="fas fa-times-circle text-red-600 mr-1"></i> Total Days Absent: <span class="text-red-700 text-sm">${absentCount}</span></span>
+                        </td>
+                    </tr>
+                ` + html;
+                
+                tbody.innerHTML = html;
+            }
+            modal.classList.remove('hidden');
+        }
+
+        /* =====================================================
+           STUDENT CHECKER LOGIC
+        ===================================================== */
+        function checkStudentStatus() {
+            const d = document.getElementById('checkStudDate').value;
+            const c = document.getElementById('checkStudClass').value.trim().toUpperCase();
+            const r = document.getElementById('checkStudRoll').value;
+            const resBox = document.getElementById('checkStudResult');
+
+            if(!d || !c || !r) {
+                resBox.className = "mt-2 p-2 rounded border text-[10px] md:text-xs text-center font-bold bg-amber-50 text-amber-800 border-amber-300";
+                resBox.innerText = "Fill all fields to check.";
+                resBox.classList.remove('hidden');
+                return;
+            }
+
+            let foundRoom = null;
+            for(let room of roomConfigsCache) {
+                let classDet = room.classDetails.find(cd => String(cd.className).toUpperCase() === c);
+                if(classDet) {
+                    let rolls = expandRolls(classDet.rolls);
+                    if(rolls.includes(r.toString())) {
+                        foundRoom = room;
+                        break;
+                    }
+                }
+            }
+
+            resBox.classList.remove('hidden');
+
+            if(!foundRoom) {
+                resBox.className = "mt-2 p-2 rounded border text-[10px] md:text-xs text-center flex flex-col gap-1 leading-tight bg-amber-50 text-amber-800 border-amber-300";
+                resBox.innerHTML = `<span class="font-black text-sm">⚠️ Not Allocated</span><span>Roll ${r} of Class ${c} has no seat in any room.</span>`;
+                return;
+            }
+
+            // Sanitized lookups
+            let safeAbsData = absenteesCache[d] || {};
+            if(Array.isArray(safeAbsData)) safeAbsData = safeAbsData[0] || {};
+            
+            const isAbsent = safeAbsData[foundRoom.id] && safeAbsData[foundRoom.id].includes(`${c}_${r}`);
+            
+            let safeDutyData = dutyRecordsCache[d] || {};
+            if(Array.isArray(safeDutyData)) safeDutyData = safeDutyData[0] || {};
+            
+            let dutyRec = safeDutyData[foundRoom.id] ? safeDutyData[foundRoom.id].invigs.filter(Boolean).join(', ') : 'None';
+
+            if(isAbsent) {
+                resBox.className = "mt-2 p-2 rounded border text-[10px] md:text-xs text-center flex flex-col gap-1 leading-tight bg-rose-50 text-rose-800 border-rose-300 shadow-inner";
+                resBox.innerHTML = `<span class="font-black text-sm"><i class="fas fa-times-circle mr-1"></i> MARKED ABSENT</span><span>Room ${foundRoom.name} (${foundRoom.gender})</span><span class="text-[9px]">Invigilators: ${dutyRec}</span>`;
+            } else {
+                resBox.className = "mt-2 p-2 rounded border text-[10px] md:text-xs text-center flex flex-col gap-1 leading-tight bg-emerald-50 text-emerald-800 border-emerald-300 shadow-sm";
+                resBox.innerHTML = `<span class="font-black text-sm"><i class="fas fa-check-circle mr-1"></i> ALLOCATED / PRESENT</span><span>Room ${foundRoom.name} (${foundRoom.gender})</span><span class="text-[9px]">Invigilators: ${dutyRec}</span>`;
+            }
         }
     </script>
 </body>
