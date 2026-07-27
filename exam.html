@@ -57,6 +57,10 @@
             <button onclick="renderView('stickers')" class="bg-pink-600 hover:bg-pink-500 text-white px-3 py-1.5 rounded shadow text-xs font-black transition-colors flex items-center">
                 <i class="fas fa-tags md:mr-1.5"></i> <span class="hidden md:inline">Stickers</span>
             </button>
+
+            <button onclick="renderView('report')" class="bg-purple-600 hover:bg-purple-500 text-white px-3 py-1.5 rounded shadow text-xs font-black transition-colors flex items-center">
+                <i class="fas fa-calculator md:mr-1.5"></i> <span class="hidden md:inline">Report</span>
+            </button>
         </div>
     </nav>
 
@@ -298,6 +302,10 @@ window.addEventListener('DOMContentLoaded', async () => {
 
             else if (viewName === 'stickers') {
                 renderRoomStickers(workspace);
+            }
+
+            else if (viewName === 'report') {
+                renderDutyReport(workspace);
             }
         }
 
@@ -686,6 +694,20 @@ function renderDutyGrid() {
             const lockBtnIcon = isLocked ? "fa-lock" : "fa-lock-open";
             const lockBtnText = isLocked ? "Locked (Staff View-Only)" : "Unlocked (Staff Can Edit Absentees)";
 
+            // 1. CALCULATE PREVIOUS EXAM DATE
+            let uniqueDates = [...new Set(scheduleCache.map(s => s.date))].sort((a,b) => new Date(a) - new Date(b));
+            let currDateIdx = uniqueDates.indexOf(date);
+            let prevDate = currDateIdx > 0 ? uniqueDates[currDateIdx - 1] : null;
+
+            // 2. GET ALL TEACHERS ASSIGNED TODAY (to filter out)
+            let allAssignedToday = new Set();
+            Object.values(dutyRecordsCache[date]).forEach(r => {
+                if(r.invigs) r.invigs.forEach(i => { if(i) allAssignedToday.add(i); });
+            });
+
+            // 3. SORT TEACHERS ALPHABETICALLY
+            let sortedTeachers = [...teachersCache].sort((a, b) => a.localeCompare(b));
+
             let tableHTML = `
                 <div class="flex justify-between items-center mb-3 p-3 bg-slate-50 border border-slate-200 rounded-lg shadow-sm">
                     <span class="text-sm font-bold text-slate-700"><i class="fas fa-shield-alt text-indigo-500 mr-1.5"></i>Absentee Portal Status:</span>
@@ -699,25 +721,39 @@ function renderDutyGrid() {
                     <th class="p-3 border font-black uppercase w-2/3">Invigilators (Max 3)</th>
                 </tr></thead><tbody class="bg-white">`;
 
-            let tOptions = `<option value="">- Select Teacher -</option>`;
-            teachersCache.forEach(t => tOptions += `<option value="${t}">${t}</option>`);
-
             roomConfigsCache.forEach(room => {
                 let rDuty = dutyRecordsCache[date][room.id] || { invigs: ['', ''] };
                 if(!rDuty.invigs) rDuty.invigs = ['', ''];
+
+                // FETCH PREVIOUS DAY DUTY FOR THIS ROOM
+                let prevDutyStr = '<span class="text-slate-400 italic">None</span>';
+                if (prevDate && dutyRecordsCache[prevDate] && dutyRecordsCache[prevDate][room.id] && dutyRecordsCache[prevDate][room.id].invigs) {
+                    let prevStaff = dutyRecordsCache[prevDate][room.id].invigs.filter(Boolean);
+                    if (prevStaff.length > 0) prevDutyStr = prevStaff.join(', ');
+                }
 
                 let bg = room.gender.toLowerCase() === 'girls' ? 'bg-pink-50' : 'bg-blue-50';
                 let absentCount = (absenteesCache[date][room.id] || []).length;
                 let absentBadge = absentCount > 0 ? `<span class="bg-rose-500 text-white px-1.5 py-0.5 rounded text-[9px] font-bold mt-1 inline-block">${absentCount} Absent</span>` : '';
 
-                let invigSelectors = rDuty.invigs.map((inv, idx) => `
+                let invigSelectors = rDuty.invigs.map((inv, idx) => {
+                    let optionsHTML = `<option value="">- Select Teacher -</option>`;
+                    sortedTeachers.forEach(t => {
+                        // Filter Logic: Show teacher only if they aren't assigned anywhere else today, OR if they are currently occupying this exact slot
+                        if (!allAssignedToday.has(t) || t === inv) {
+                            optionsHTML += `<option value="${t}" ${t === inv ? 'selected' : ''}>${t}</option>`;
+                        }
+                    });
+
+                    return `
                     <div class="flex items-center gap-1 mb-1">
                         <select onchange="updateDuty('${date}', '${room.id}', ${idx}, this.value)" class="flex-1 p-1.5 border border-slate-300 rounded outline-none shadow-inner font-bold text-slate-700 bg-white">
-                            ${tOptions.replace(`value="${inv}"`, `value="${inv}" selected`)}
+                            ${optionsHTML}
                         </select>
                         <button onclick="removeInvig('${date}', '${room.id}', ${idx})" class="text-rose-500 hover:bg-rose-100 p-1.5 rounded"><i class="fas fa-times"></i></button>
                     </div>
-                `).join('');
+                    `;
+                }).join('');
 
                 let addBtn = rDuty.invigs.length < 3 ? `<button onclick="addInvig('${date}', '${room.id}')" class="text-[10px] bg-slate-200 hover:bg-slate-300 text-slate-700 px-2 py-1 rounded font-bold mt-1 shadow-sm">+ Add Teacher</button>` : '';
 
@@ -734,6 +770,9 @@ function renderDutyGrid() {
                                 </button>
                             </div>
                             <div class="text-[10px] font-bold text-slate-700">Classes: ${room.classesList.join(', ')}</div>
+                            <div class="text-[9px] font-bold text-indigo-700 mt-1.5 bg-indigo-100 border border-indigo-200 p-1.5 rounded-md shadow-sm">
+                                <b>Prev Day Duty:</b><br>${prevDutyStr}
+                            </div>
                             ${absentBadge}
                         </td>
                         <td class="p-3 border align-top bg-white/50">
@@ -751,7 +790,6 @@ function renderDutyGrid() {
                 </div>`;
             gridArea.innerHTML = tableHTML;
         }
-
         async function toggleDateLock(date) {
             if(!dutyRecordsCache[date]) dutyRecordsCache[date] = {};
             if(!dutyRecordsCache[date].meta) dutyRecordsCache[date].meta = { isLocked: false };
@@ -1406,6 +1444,106 @@ function executeSmartAssign() {
                     </div>
                 </div>
             `;
+        }
+
+        /* =====================================================
+           DUTY REPORT CALCULATOR
+        ==================================================== */
+        function renderDutyReport(workspace) {
+            let uniqueDates = [...new Set(scheduleCache.map(s => s.date))].sort((a,b) => new Date(a) - new Date(b));
+            let dateOptions = uniqueDates.map(d => `<option value="${d}">${d.split('-').reverse().join('-')}</option>`).join('');
+
+            workspace.innerHTML = `
+                <div class="max-w-4xl mx-auto bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+                    <h2 class="font-black text-slate-800 text-xl mb-4 border-b pb-3"><i class="fas fa-calculator text-indigo-500 mr-2"></i> Staff Duty Workload Calculator</h2>
+                    
+                    <div class="flex flex-col sm:flex-row gap-4 mb-6 bg-slate-50 p-4 rounded-lg border border-slate-200">
+                        <div class="flex-1">
+                            <label class="block text-[10px] font-black text-slate-500 mb-1 uppercase tracking-wide">Start Date</label>
+                            <select id="reportStartDate" class="w-full p-2 border border-slate-300 rounded font-bold text-slate-700 outline-none">
+                                <option value="">-- Select Start Date --</option>${dateOptions}
+                            </select>
+                        </div>
+                        <div class="flex-1">
+                            <label class="block text-[10px] font-black text-slate-500 mb-1 uppercase tracking-wide">End Date</label>
+                            <select id="reportEndDate" class="w-full p-2 border border-slate-300 rounded font-bold text-slate-700 outline-none">
+                                <option value="">-- Select End Date --</option>${dateOptions}
+                            </select>
+                        </div>
+                        <div class="flex items-end">
+                            <button onclick="calculateDutyReport()" class="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-6 rounded shadow-md transition-colors">
+                                Calculate Duties
+                            </button>
+                        </div>
+                    </div>
+
+                    <div id="reportResultArea">
+                        <p class="text-xs text-slate-400 italic text-center py-8">Select a date range to generate the teacher workload report.</p>
+                    </div>
+                </div>
+            `;
+        }
+
+        function calculateDutyReport() {
+            const start = document.getElementById('reportStartDate').value;
+            const end = document.getElementById('reportEndDate').value;
+            const resArea = document.getElementById('reportResultArea');
+
+            if (!start || !end) return alert("Please select both start and end dates.");
+            
+            let startDate = new Date(start);
+            let endDate = new Date(end);
+
+            if (startDate > endDate) return alert("Start date cannot be after end date.");
+
+            let workload = {};
+            teachersCache.forEach(t => workload[t] = 0);
+
+            // Filter dates within range
+            let datesInRange = Object.keys(dutyRecordsCache).filter(d => {
+                let curr = new Date(d);
+                return curr >= startDate && curr <= endDate;
+            });
+
+            // Tally up the duties
+            datesInRange.forEach(d => {
+                Object.keys(dutyRecordsCache[d]).forEach(roomId => {
+                    if(roomId === 'meta' || roomId === 'excluded') return;
+                    let room = dutyRecordsCache[d][roomId];
+                    (room.invigs || []).forEach(i => {
+                        if (i && workload[i] !== undefined) workload[i]++;
+                    });
+                });
+            });
+
+            // Sort by highest workload, then alphabetically
+            let sortedTeachers = Object.keys(workload).sort((a,b) => workload[b] - workload[a] || a.localeCompare(b));
+
+            let html = `
+                <table class="w-full border-collapse text-sm text-left shadow-sm rounded-lg overflow-hidden border border-slate-200">
+                    <thead class="bg-slate-200 text-slate-700">
+                        <tr>
+                            <th class="p-3 border-b font-black uppercase">Teacher Name</th>
+                            <th class="p-3 border-b font-black uppercase text-center w-32">Total Duties</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white">
+            `;
+
+            sortedTeachers.forEach(t => {
+                let count = workload[t];
+                let bgClass = count === 0 ? "bg-rose-50 text-rose-700 font-medium" : (count >= Math.max(...Object.values(workload)) && count > 0 ? "bg-indigo-50 text-indigo-900 font-bold" : "text-slate-800");
+                
+                html += `
+                    <tr class="border-b hover:bg-slate-50 transition-colors ${bgClass}">
+                        <td class="p-2 border-r pl-4">${t}</td>
+                        <td class="p-2 text-center font-black text-lg">${count}</td>
+                    </tr>
+                `;
+            });
+
+            html += `</tbody></table>`;
+            resArea.innerHTML = html;
         }
     </script>
 </body>
