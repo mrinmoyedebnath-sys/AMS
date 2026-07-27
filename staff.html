@@ -265,16 +265,24 @@
                         <select id="checkStudDate" class="w-full border border-slate-300 p-1.5 rounded text-[10px] md:text-xs outline-none focus:border-cyan-500 bg-slate-50 font-bold text-slate-700">
                             <option value="">-- Select Date --</option>
                         </select>
-                        <div class="flex gap-2">
-                            <select id="checkStudClass" class="w-1/2 border border-slate-300 p-1.5 rounded text-[10px] md:text-xs outline-none focus:border-cyan-500 bg-slate-50 font-bold text-slate-700">
+                        <div class="grid grid-cols-3 gap-1.5">
+                            <select id="checkStudClass" class="border border-slate-300 p-1 rounded text-[10px] md:text-xs outline-none focus:border-cyan-500 bg-slate-50 font-bold text-slate-700">
                                 <option value="">-- Class --</option>
                             </select>
-                            <input type="number" id="checkStudRoll" placeholder="Roll No" class="w-1/2 border border-slate-300 p-1.5 rounded text-[10px] md:text-xs outline-none focus:border-cyan-500 bg-slate-50 font-bold text-slate-700">
+                            <select id="checkStudGender" class="border border-slate-300 p-1 rounded text-[10px] md:text-xs outline-none focus:border-cyan-500 bg-slate-50 font-bold text-slate-700">
+                                <option value="">All Types</option>
+                                <option value="Girls">Girls</option>
+                                <option value="Boys">Boys</option>
+                                <option value="Mixed">Mixed</option>
+                            </select>
+                            <input type="number" id="checkStudRoll" placeholder="Roll No" class="border border-slate-300 p-1 rounded text-[10px] md:text-xs outline-none focus:border-cyan-500 bg-slate-50 font-bold text-slate-700">
                         </div>
                         <button onclick="checkStudentStatus()" class="w-full bg-cyan-600 hover:bg-cyan-700 text-white font-bold py-1.5 rounded shadow transition-colors text-[10px] md:text-xs mt-1">Check Status</button>
-                        <div id="checkStudResult" class="hidden mt-2 p-2 rounded border text-[10px] md:text-xs text-center flex flex-col gap-1 leading-tight"></div>
+                        <div id="checkStudResult" class="hidden mt-2 flex flex-col gap-2"></div>
                     </div>
                 </div>
+
+
                 
                 <!-- LEAVE APPLICATION -->
                 <div class="bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden shrink-0">
@@ -1502,82 +1510,105 @@ if (keyStr === 'dutyRecords') {
            STUDENT CHECKER LOGIC
         ===================================================== */
         /* =====================================================
-           STUDENT CHECKER LOGIC
+           STUDENT CHECKER LOGIC (SUPPORTING GIRLS & BOYS)
         ===================================================== */
         function checkStudentStatus() {
             const d = document.getElementById('checkStudDate').value;
             const c = document.getElementById('checkStudClass').value.trim().toUpperCase();
+            const g = (document.getElementById('checkStudGender')?.value || '').trim().toUpperCase();
             const r = document.getElementById('checkStudRoll').value;
             const resBox = document.getElementById('checkStudResult');
 
-            if(!d || !c || !r) {
+            if (!d || !c || !r) {
                 resBox.className = "mt-2 p-2 rounded border text-[10px] md:text-xs text-center font-bold bg-amber-50 text-amber-800 border-amber-300";
-                resBox.innerText = "Fill all fields to check.";
+                resBox.innerText = "Please select Date, Class, and enter Roll No.";
                 resBox.classList.remove('hidden');
                 return;
             }
 
-            let foundRoom = null;
-            for(let room of roomConfigsCache) {
-                let classDet = room.classDetails.find(cd => String(cd.className).toUpperCase() === c);
-                if(classDet) {
+            let matchingRooms = [];
+
+            for (let room of roomConfigsCache) {
+                let roomGender = String(room.gender || '').trim().toUpperCase();
+                
+                // If a specific gender is selected, skip non-matching rooms
+                if (g && roomGender && roomGender !== g && roomGender !== 'MIXED') {
+                    continue;
+                }
+
+                // Safety fallback if classDetails is missing/empty
+                let details = room.classDetails || [];
+                if (details.length === 0 && room.classesList) {
+                    details = room.classesList.map(clsName => ({ className: clsName, rolls: "1-200" }));
+                }
+
+                let classDet = details.find(cd => String(cd.className).trim().toUpperCase() === c);
+                if (classDet) {
                     let rolls = expandRolls(classDet.rolls);
-                    if(rolls.includes(r.toString())) {
-                        foundRoom = room;
-                        break;
+                    if (rolls.length === 0 || rolls.includes(r.toString())) {
+                        matchingRooms.push(room);
                     }
                 }
             }
 
             resBox.classList.remove('hidden');
 
-            if(!foundRoom) {
+            if (matchingRooms.length === 0) {
                 resBox.className = "mt-2 p-3 rounded-lg border-2 text-center flex flex-col gap-1 leading-tight bg-amber-50 text-amber-800 border-amber-300 shadow-inner";
                 resBox.innerHTML = `
                     <span class="font-black text-sm mb-1">⚠️ Not Allocated</span>
                     <div class="bg-white/80 border border-amber-200 rounded p-2 mx-auto shadow-sm w-full">
-                        <span class="font-bold text-sm text-slate-800">Class ${c} - Roll ${r}</span>
+                        <span class="font-bold text-sm text-slate-800">Class ${c} - Roll ${r} ${g ? '(' + g + ')' : ''}</span>
                     </div>
-                    <span class="text-[10px] mt-1">This student has no seat allocated in any room.</span>`;
+                    <span class="text-[10px] mt-1">No seat allocated in any matching room.</span>`;
                 return;
             }
 
-            // Sanitized lookups
-            let safeAbsData = absenteesCache[d] || {};
-            if(Array.isArray(safeAbsData)) safeAbsData = safeAbsData[0] || {};
+            let resultHTML = '';
             
-            const isAbsent = safeAbsData[foundRoom.id] && safeAbsData[foundRoom.id].includes(`${c}_${r}`);
-            
-            let safeDutyData = dutyRecordsCache[d] || {};
-            if(Array.isArray(safeDutyData)) safeDutyData = safeDutyData[0] || {};
-            
-            let dutyRec = safeDutyData[foundRoom.id] ? safeDutyData[foundRoom.id].invigs.filter(Boolean).join(', ') : 'None';
+            matchingRooms.forEach(foundRoom => {
+                let safeAbsData = absenteesCache[d] || {};
+                if (Array.isArray(safeAbsData)) safeAbsData = safeAbsData[0] || {};
+                
+                const isAbsent = safeAbsData[foundRoom.id] && safeAbsData[foundRoom.id].includes(`${c}_${r}`);
+                
+                let safeDutyData = dutyRecordsCache[d] || {};
+                if (Array.isArray(safeDutyData)) safeDutyData = safeDutyData[0] || {};
+                
+                let invigList = safeDutyData[foundRoom.id] ? (safeDutyData[foundRoom.id].invigs || []).filter(Boolean).join(', ') : '';
+                let dutyRec = invigList || 'None Assigned';
 
-            if(isAbsent) {
-                resBox.className = "mt-2 p-3 rounded-lg border-2 text-center flex flex-col gap-2 leading-tight bg-rose-50 text-rose-800 border-rose-300 shadow-inner";
-                resBox.innerHTML = `
-                    <span class="font-black text-sm"><i class="fas fa-times-circle mr-1"></i> MARKED ABSENT</span>
-                    <div class="bg-white/80 border border-rose-200 rounded p-2 mx-auto shadow-sm w-full">
-                        <span class="font-black text-sm text-slate-800 block">Class ${c} - Roll ${r}</span>
-                        <span class="font-bold text-xs text-rose-600 block mt-0.5">(${foundRoom.gender})</span>
-                    </div>
-                    <div class="bg-white/50 rounded p-2 border border-rose-200">
-                        <span class="block font-bold text-xs text-slate-800">Room ${foundRoom.name}</span>
-                        <span class="block text-[9px] mt-1 text-slate-600">Invigilators: ${dutyRec}</span>
+                if (isAbsent) {
+                    resultHTML += `
+                    <div class="p-3 rounded-lg border-2 text-center flex flex-col gap-2 leading-tight bg-rose-50 text-rose-800 border-rose-300 shadow-inner">
+                        <span class="font-black text-sm"><i class="fas fa-times-circle mr-1"></i> MARKED ABSENT</span>
+                        <div class="bg-white/80 border border-rose-200 rounded p-2 mx-auto shadow-sm w-full">
+                            <span class="font-black text-sm text-slate-800 block">Class ${c} - Roll ${r}</span>
+                            <span class="font-bold text-xs text-rose-600 block mt-0.5">(${foundRoom.gender || 'General'})</span>
+                        </div>
+                        <div class="bg-white/50 rounded p-2 border border-rose-200">
+                            <span class="block font-bold text-xs text-slate-800">Allocated: Room ${foundRoom.name}</span>
+                            <span class="block text-[9px] mt-1 text-slate-600">Invigilators: ${dutyRec}</span>
+                        </div>
                     </div>`;
-            } else {
-                resBox.className = "mt-2 p-3 rounded-lg border-2 text-center flex flex-col gap-2 leading-tight bg-emerald-50 text-emerald-800 border-emerald-300 shadow-sm";
-                resBox.innerHTML = `
-                    <span class="font-black text-sm"><i class="fas fa-check-circle mr-1"></i> ALLOCATED / PRESENT</span>
-                    <div class="bg-white/80 border border-emerald-200 rounded p-2 mx-auto shadow-sm w-full">
-                        <span class="font-black text-sm text-slate-800 block">Class ${c} - Roll ${r}</span>
-                        <span class="font-bold text-xs text-emerald-700 block mt-0.5">(${foundRoom.gender})</span>
-                    </div>
-                    <div class="bg-white/50 rounded p-2 border border-emerald-200">
-                        <span class="block font-bold text-xs text-slate-800">Room ${foundRoom.name}</span>
-                        <span class="block text-[9px] mt-1 text-slate-600">Invigilators: ${dutyRec}</span>
+                } else {
+                    resultHTML += `
+                    <div class="p-3 rounded-lg border-2 text-center flex flex-col gap-2 leading-tight bg-emerald-50 text-emerald-800 border-emerald-300 shadow-sm">
+                        <span class="font-black text-sm"><i class="fas fa-check-circle mr-1"></i> ALLOCATED / PRESENT</span>
+                        <div class="bg-white/80 border border-emerald-200 rounded p-2 mx-auto shadow-sm w-full">
+                            <span class="font-black text-sm text-slate-800 block">Class ${c} - Roll ${r}</span>
+                            <span class="font-bold text-xs text-emerald-700 block mt-0.5">(${foundRoom.gender || 'General'})</span>
+                        </div>
+                        <div class="bg-white/50 rounded p-2 border border-emerald-200">
+                            <span class="block font-bold text-xs text-slate-800">Allocated: Room ${foundRoom.name}</span>
+                            <span class="block text-[9px] mt-1 text-slate-600">Invigilators: ${dutyRec}</span>
+                        </div>
                     </div>`;
-            }
+                }
+            });
+
+            resBox.className = "mt-2 flex flex-col gap-2";
+            resBox.innerHTML = resultHTML;
         }
     </script>
 </body>
