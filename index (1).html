@@ -1,0 +1,2142 @@
+<!DOCTYPE html>
+
+<html lang="en">
+
+<head>
+
+<meta charset="UTF-8">
+
+<meta
+name="viewport"
+content="width=device-width, initial-scale=1.0"
+
+>
+
+<title>System Login</title>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<style>
+
+* {
+    box-sizing: border-box;
+}
+
+
+html,
+body {
+
+    margin: 0;
+
+    padding: 0;
+
+    min-height: 100%;
+
+}
+
+
+body {
+
+    min-height: 100vh;
+
+    display: flex;
+
+    align-items: center;
+
+    justify-content: center;
+
+    padding: 20px;
+
+    background:
+        #f4f4f9;
+
+    font-family:
+        Arial,
+        Helvetica,
+        sans-serif;
+
+}
+
+
+.hidden {
+
+    display: none !important;
+
+}
+
+
+/* =====================================================
+   LOGIN CARD
+===================================================== */
+
+
+.login-container {
+
+    width: 100%;
+
+    max-width: 430px;
+
+}
+
+
+.login-card {
+
+    width: 100%;
+
+    padding: 32px;
+
+    background:
+        #ffffff;
+
+    border-radius:
+        15px;
+
+    box-shadow:
+        0 15px 45px
+        rgba(
+            0,
+            0,
+            0,
+            0.12
+        );
+
+}
+
+
+.login-card h2 {
+
+    margin:
+        0 0 8px 0;
+
+    text-align:
+        center;
+
+    color:
+        #3f51b5;
+
+    font-size:
+        25px;
+
+    font-weight:
+        900;
+
+}
+
+
+.subtitle {
+
+    margin:
+        0 0 25px 0;
+
+    text-align:
+        center;
+
+    color:
+        #777;
+
+    font-size:
+        12px;
+
+}
+
+
+label {
+
+    display:
+        block;
+
+    margin:
+        14px 0 6px 0;
+
+    color:
+        #374151;
+
+    font-size:
+        13px;
+
+    font-weight:
+        700;
+
+}
+
+
+select,
+input {
+
+    width:
+        100%;
+
+    height:
+        46px;
+
+    padding:
+        0 12px;
+
+    border:
+        1px solid #d1d5db;
+
+    border-radius:
+        7px;
+
+    background:
+        #ffffff;
+
+    font-size:
+        14px;
+
+    outline:
+        none;
+
+}
+
+
+select:focus,
+input:focus {
+
+    border-color:
+        #3f51b5;
+
+    box-shadow:
+        0 0 0 3px
+        rgba(
+            63,
+            81,
+            181,
+            0.12
+        );
+
+}
+
+
+button {
+
+    width:
+        100%;
+
+    height:
+        46px;
+
+    margin-top:
+        18px;
+
+    border:
+        none;
+
+    border-radius:
+        7px;
+
+    color:
+        #ffffff;
+
+    font-size:
+        14px;
+
+    font-weight:
+        800;
+
+    cursor:
+        pointer;
+
+}
+
+
+button:disabled {
+
+    opacity:
+        0.6;
+
+    cursor:
+        not-allowed;
+
+}
+
+
+/* =====================================================
+   ROLE SELECTOR
+===================================================== */
+
+
+#role-selector {
+
+    margin-bottom:
+        10px;
+
+}
+
+
+/* =====================================================
+   ADMIN BUTTON
+===================================================== */
+
+
+.btn-admin {
+
+    background:
+        #3f51b5;
+
+}
+
+
+.btn-admin:hover {
+
+    background:
+        #303f9f;
+
+}
+
+
+/* =====================================================
+   STAFF BUTTON
+===================================================== */
+
+
+.btn-teacher {
+
+    background:
+        #10b981;
+
+}
+
+
+.btn-teacher:hover {
+
+    background:
+        #059669;
+
+}
+
+
+/* =====================================================
+   SAVE PASSWORD BUTTON
+===================================================== */
+
+
+.btn-save {
+
+    background:
+        #f59e0b;
+
+}
+
+
+.btn-save:hover {
+
+    background:
+        #d97706;
+
+}
+
+
+/* =====================================================
+   STATUS
+===================================================== */
+
+
+#connection-status {
+
+    margin:
+        8px 0 15px 0;
+
+    text-align:
+        center;
+
+    font-size:
+        11px;
+
+    font-weight:
+        700;
+
+}
+
+
+.status-loading {
+
+    color:
+        #6b7280;
+
+}
+
+
+.status-success {
+
+    color:
+        #059669;
+
+}
+
+
+.status-error {
+
+    color:
+        #dc2626;
+
+}
+
+
+/* =====================================================
+   MESSAGES
+===================================================== */
+
+
+.message {
+
+    display:
+        none;
+
+    margin-top:
+        15px;
+
+    padding:
+        10px;
+
+    border-radius:
+        7px;
+
+    text-align:
+        center;
+
+    font-size:
+        12px;
+
+    font-weight:
+        700;
+
+}
+
+
+.error {
+
+    color:
+        #b91c1c;
+
+    background:
+        #fef2f2;
+
+}
+
+
+.success {
+
+    color:
+        #047857;
+
+    background:
+        #ecfdf5;
+
+}
+
+
+/* =====================================================
+   FIRST PASSWORD
+===================================================== */
+
+
+.password-box {
+
+    margin-top:
+        20px;
+
+    padding:
+        18px;
+
+    background:
+        #fffbeb;
+
+    border:
+        2px solid #f59e0b;
+
+    border-radius:
+        10px;
+
+}
+
+
+.password-box h3 {
+
+    margin:
+        0 0 8px 0;
+
+    text-align:
+        center;
+
+    color:
+        #b45309;
+
+    font-size:
+        17px;
+
+}
+
+
+.password-box p {
+
+    margin:
+        0 0 12px 0;
+
+    text-align:
+        center;
+
+    color:
+        #92400e;
+
+    font-size:
+        11px;
+
+    line-height:
+        1.5;
+
+}
+
+
+</style>
+
+</head>
+
+<body>
+
+<!-- =====================================================
+     LOGIN CONTAINER
+===================================================== -->
+
+<div
+    id="login-screen"
+    class="login-container"
+>
+
+<div class="login-card">
+
+<h2>
+
+System Login
+
+</h2>
+
+<p class="subtitle">
+
+School Management System
+
+</p>
+
+<!-- =================================================
+     ROLE SELECTION
+================================================== -->
+
+<label
+for="role-selector"
+
+>
+
+Select Your Role
+
+</label>
+
+<select
+id="role-selector"
+onchange="handleRoleChange()"
+
+>
+
+<option value="">
+
+-- Choose Role --
+
+</option>
+
+<option value="admin">
+
+🛡️ School Admin
+
+</option>
+
+<option value="teacher">
+
+👩‍🏫 Individual Staff
+
+</option>
+
+</select>
+
+<!-- =================================================
+     CONNECTION STATUS
+================================================== -->
+
+<div
+    id="connection-status"
+    class="status-loading"
+>
+
+Connecting to Database...
+
+</div>
+
+<!-- =================================================
+     ADMIN LOGIN
+
+     THIS IS THE EXACT ADMIN FLOW REQUESTED
+================================================== -->
+
+<div
+    id="admin-login-fields"
+    class="hidden"
+>
+
+
+        <div class="login-card">
+            <h2 style="color: #3f51b5;">System Login</h2>
+            <select id="login-school-selector"><option value="">Loading schools...</option></select>
+            <input type="password" id="login-password" placeholder="Enter Administrator Password">
+            <button onclick="loginAsSchool()" style="background: #3f51b5; color: white;">Secure Login</button>
+        </div>
+
+
+</div>
+
+<!-- =================================================
+     INDIVIDUAL STAFF LOGIN
+
+     EXISTING STAFF FLOW REMAINS SEPARATE
+================================================== -->
+
+<div
+    id="teacher-login-fields"
+    class="hidden"
+>
+
+<label>
+
+Select Your Name
+
+</label>
+
+<select
+id="teacher-selector"
+
+>
+
+<option value="">
+
+Loading staff...
+
+</option>
+
+</select>
+
+<label>
+
+Staff Password
+
+</label>
+
+<input
+type="password"
+id="teacher-password"
+placeholder="Password (Default: 1234)"
+
+>
+
+<button
+type="button"
+class="btn-teacher"
+onclick="loginAsTeacher()"
+
+>
+
+Login to Staff Portal
+
+</button>
+
+</div>
+
+<!-- =================================================
+     FIRST LOGIN PASSWORD SETUP
+================================================== -->
+
+<div
+    id="change-password-fields"
+    class="password-box hidden"
+>
+
+<h3>
+
+Set Your New Password
+
+</h3>
+
+<p>
+
+You are using the default password <strong>1234</strong>.
+
+<br>
+
+Please create a new password before continuing.
+
+</p>
+
+<label>
+
+New Password
+
+</label>
+
+<input
+type="password"
+id="new-password"
+placeholder="Enter new password"
+
+>
+
+<label>
+
+Confirm New Password
+
+</label>
+
+<input
+type="password"
+id="confirm-password"
+placeholder="Confirm new password"
+
+>
+
+<button
+type="button"
+class="btn-save"
+onclick="saveNewStaffPassword()"
+
+>
+
+Save New Password
+
+</button>
+
+</div>
+
+<!-- =================================================
+     ERROR MESSAGE
+================================================== -->
+
+<div
+    id="loginErrorMsg"
+    class="message error"
+></div>
+
+<!-- =================================================
+     SUCCESS MESSAGE
+================================================== -->
+
+<div
+    id="successMsg"
+    class="message success"
+></div>
+
+</div>
+
+</div>
+
+<!-- =====================================================
+     SUPABASE CONFIG
+
+     This file must define:
+
+     const supabaseClient =
+     window.supabase.createClient(
+         SUPABASE_URL,
+         SUPABASE_ANON_KEY
+     );
+
+====================================================== -->
+
+ <script src="supabase-config.js"></script>
+    <script src="app.js"></script>
+
+<script>
+
+/* =====================================================
+   GLOBAL VARIABLES
+===================================================== */
+
+
+let schoolsDatabase = [];
+
+let staffCredentialsMap = {};
+
+let currentStaffName = '';
+
+
+/* =====================================================
+   MESSAGE FUNCTIONS
+===================================================== */
+
+
+function showError(
+    message
+) {
+
+    const error =
+        document.getElementById(
+            'loginErrorMsg'
+        );
+
+
+    const success =
+        document.getElementById(
+            'successMsg'
+        );
+
+
+    success.style.display =
+        'none';
+
+
+    error.textContent =
+        message;
+
+
+    error.style.display =
+        'block';
+
+}
+
+
+function showSuccess(
+    message
+) {
+
+    const error =
+        document.getElementById(
+            'loginErrorMsg'
+        );
+
+
+    const success =
+        document.getElementById(
+            'successMsg'
+        );
+
+
+    error.style.display =
+        'none';
+
+
+    success.textContent =
+        message;
+
+
+    success.style.display =
+        'block';
+
+}
+
+
+function clearMessages() {
+
+    document.getElementById(
+        'loginErrorMsg'
+    ).style.display =
+        'none';
+
+
+    document.getElementById(
+        'successMsg'
+    ).style.display =
+        'none';
+
+}
+
+
+/* =====================================================
+   ROLE CHANGE
+
+   ADMIN:
+   login-school-selector
+   login-password
+   loginAsSchool()
+
+   TEACHER:
+   teacher-selector
+   teacher-password
+   loginAsTeacher()
+===================================================== */
+
+
+function handleRoleChange() {
+
+
+    clearMessages();
+
+
+    const role =
+
+        document.getElementById(
+            'role-selector'
+        ).value;
+
+
+    const adminFields =
+
+        document.getElementById(
+            'admin-login-fields'
+        );
+
+
+    const teacherFields =
+
+        document.getElementById(
+            'teacher-login-fields'
+        );
+
+
+    const changePasswordFields =
+
+        document.getElementById(
+            'change-password-fields'
+        );
+
+
+    /* -----------------------------------------------
+       ALWAYS HIDE PASSWORD SETUP WHEN CHANGING ROLE
+    ------------------------------------------------ */
+
+
+    changePasswordFields.classList.add(
+        'hidden'
+    );
+
+
+    if (
+        role ===
+        'admin'
+    ) {
+
+
+        adminFields.classList.remove(
+            'hidden'
+        );
+
+
+        teacherFields.classList.add(
+            'hidden'
+        );
+
+
+    }
+
+
+    else if (
+        role ===
+        'teacher'
+    ) {
+
+
+        teacherFields.classList.remove(
+            'hidden'
+        );
+
+
+        adminFields.classList.add(
+            'hidden'
+        );
+
+
+    }
+
+
+    else {
+
+
+        adminFields.classList.add(
+            'hidden'
+        );
+
+
+        teacherFields.classList.add(
+            'hidden'
+        );
+
+
+    }
+
+}
+
+
+/* =====================================================
+   LOAD SCHOOLS
+
+   SUPABASE TABLE:
+
+   schools
+   ----------------
+   id
+   school_name
+   password
+===================================================== */
+
+
+async function loadSchools() {
+
+
+    const {
+
+        data,
+
+        error
+
+    } =
+
+        await supabaseClient
+
+        .from(
+            'schools'
+        )
+
+        .select(
+            'id, school_name, password'
+        )
+
+        .order(
+            'school_name',
+            {
+                ascending:
+                    true
+            }
+        );
+
+
+    if (
+        error
+    ) {
+
+        console.error(
+            'Schools Error:',
+            error
+        );
+
+
+        throw error;
+
+    }
+
+
+    schoolsDatabase =
+        data || [];
+
+
+    const selector =
+
+        document.getElementById(
+            'login-school-selector'
+        );
+
+
+    selector.innerHTML =
+
+        '<option value="">-- Choose School --</option>';
+
+
+    schoolsDatabase.forEach(
+
+        function (
+            school
+        ) {
+
+
+            const option =
+
+                document.createElement(
+                    'option'
+                );
+
+
+            option.value =
+
+                String(
+                    school.id
+                );
+
+
+            option.textContent =
+
+                school.school_name
+                ||
+                'Unnamed School';
+
+
+            selector.appendChild(
+                option
+            );
+
+
+        }
+
+    );
+
+}
+
+
+/* =====================================================
+   LOAD STAFF
+
+   THIS PART IS FOR INDIVIDUAL LOGIN ONLY
+===================================================== */
+
+
+async function loadStaff() {
+
+
+    const {
+
+        data,
+
+        error
+
+    } =
+
+        await supabaseClient
+
+        .from(
+            'exam_db'
+        )
+
+        .select(
+            'data_key, json_payload'
+        );
+
+
+    if (
+        error
+    ) {
+
+        console.error(
+            'Staff Error:',
+            error
+        );
+
+
+        throw error;
+
+    }
+
+
+    let staffNames = [];
+
+
+    staffCredentialsMap =
+        {};
+
+
+    (
+        data ||
+        []
+    ).forEach(
+
+        function (
+            row
+        ) {
+
+
+            /* -----------------------------------------
+               STAFF LIST
+            ----------------------------------------- */
+
+
+            if (
+
+                (
+                    row.data_key ===
+                    'staff'
+
+                    ||
+
+                    row.data_key ===
+                    'teachers'
+                )
+
+                &&
+
+                Array.isArray(
+                    row.json_payload
+                )
+
+            ) {
+
+
+                staffNames =
+
+                    staffNames.concat(
+                        row.json_payload
+                    );
+
+
+            }
+
+
+            /* -----------------------------------------
+               STAFF OBJECT
+            ----------------------------------------- */
+
+
+            if (
+
+                row.json_payload
+
+                &&
+
+                typeof row.json_payload ===
+                'object'
+
+                &&
+
+                !Array.isArray(
+                    row.json_payload
+                )
+
+            ) {
+
+
+                if (
+
+                    Array.isArray(
+                        row.json_payload.staff
+                    )
+
+                ) {
+
+                    staffNames =
+
+                        staffNames.concat(
+                            row.json_payload.staff
+                        );
+
+                }
+
+
+                if (
+
+                    Array.isArray(
+                        row.json_payload.teachers
+                    )
+
+                ) {
+
+                    staffNames =
+
+                        staffNames.concat(
+                            row.json_payload.teachers
+                        );
+
+                }
+
+            }
+
+
+            /* -----------------------------------------
+               STAFF CREDENTIALS
+            ----------------------------------------- */
+
+
+            if (
+
+                row.data_key ===
+                'credentials'
+
+                &&
+
+                row.json_payload
+
+            ) {
+
+
+                staffCredentialsMap =
+
+                    Object.assign(
+
+                        staffCredentialsMap,
+
+                        row.json_payload
+
+                    );
+
+            }
+
+
+        }
+
+    );
+
+
+    /* -----------------------------------------------
+       REMOVE DUPLICATES
+
+       IMPORTANT:
+       Correct syntax is:
+
+       [...new Set(staffNames)]
+
+       NOT:
+
+       [.new Set(staffNames)]
+    ------------------------------------------------ */
+
+
+    staffNames =
+
+        [
+
+            ...new Set(
+                staffNames
+            )
+
+        ]
+
+        .filter(
+
+            function (
+                name
+            ) {
+
+                return (
+
+                    typeof name ===
+                    'string'
+
+                    &&
+
+                    name.trim() !==
+                    ''
+
+                );
+
+            }
+
+        )
+
+        .sort();
+
+
+    const selector =
+
+        document.getElementById(
+            'teacher-selector'
+        );
+
+
+    selector.innerHTML =
+
+        '<option value="">-- Choose Your Name --</option>';
+
+
+    staffNames.forEach(
+
+        function (
+            name
+        ) {
+
+
+            const option =
+
+                document.createElement(
+                    'option'
+                );
+
+
+            option.value =
+                name;
+
+
+            option.textContent =
+                name;
+
+
+            selector.appendChild(
+                option
+            );
+
+
+        }
+
+    );
+
+}
+
+
+/* =====================================================
+   ADMIN LOGIN
+
+   EXACT REQUESTED FLOW:
+
+   login-school-selector
+   login-password
+   loginAsSchool()
+   ↓
+   home.html
+===================================================== */
+
+
+
+/* =====================================================
+   INDIVIDUAL STAFF LOGIN
+
+   REMAINS SEPARATE FROM ADMIN LOGIN
+===================================================== */
+
+
+function loginAsTeacher() {
+
+
+    clearMessages();
+
+
+    const teacherName =
+
+        document.getElementById(
+            'teacher-selector'
+        ).value;
+
+
+    const password =
+
+        document.getElementById(
+            'teacher-password'
+        ).value;
+
+
+    if (
+        !teacherName
+    ) {
+
+        showError(
+            'Please select your name.'
+        );
+
+        return;
+
+    }
+
+
+    if (
+        !password
+    ) {
+
+        showError(
+            'Please enter your password.'
+        );
+
+        return;
+
+    }
+
+
+    currentStaffName =
+        teacherName;
+
+
+    /* -----------------------------------------------
+       GET STAFF CREDENTIAL
+    ------------------------------------------------ */
+
+
+    const credential =
+
+        staffCredentialsMap[
+            teacherName
+        ];
+
+
+    let currentPassword =
+        '1234';
+
+
+    let passwordChanged =
+        false;
+
+
+    /* -----------------------------------------------
+       OLD STRING FORMAT
+    ------------------------------------------------ */
+
+
+    if (
+
+        typeof credential ===
+        'string'
+
+    ) {
+
+
+        currentPassword =
+            credential;
+
+
+        passwordChanged =
+
+            credential !==
+            '1234';
+
+
+    }
+
+
+    /* -----------------------------------------------
+       NEW OBJECT FORMAT
+    ------------------------------------------------ */
+
+
+    else if (
+
+        credential
+
+        &&
+
+        typeof credential ===
+        'object'
+
+    ) {
+
+
+        currentPassword =
+
+            credential.password
+
+            ||
+
+            '1234';
+
+
+        passwordChanged =
+
+            credential.passwordChanged ===
+            true;
+
+
+    }
+
+
+    /* -----------------------------------------------
+       FIRST LOGIN
+
+       DEFAULT PASSWORD = 1234
+    ------------------------------------------------ */
+
+
+    if (
+
+        !passwordChanged
+
+        &&
+
+        String(
+            currentPassword
+        ) ===
+        '1234'
+
+    ) {
+
+
+        if (
+
+            String(
+                password
+            ) !==
+            '1234'
+
+        ) {
+
+            showError(
+
+                'First login requires the default password 1234.'
+
+            );
+
+            return;
+
+        }
+
+
+        document.getElementById(
+            'teacher-login-fields'
+        ).classList.add(
+            'hidden'
+        );
+
+
+        document.getElementById(
+            'change-password-fields'
+        ).classList.remove(
+            'hidden'
+        );
+
+
+        showSuccess(
+
+            'First login detected. Please set your new password.'
+
+        );
+
+
+        return;
+
+    }
+
+
+    /* -----------------------------------------------
+       NORMAL STAFF PASSWORD
+    ------------------------------------------------ */
+
+
+    if (
+
+        String(
+            password
+        )
+
+        !==
+
+        String(
+            currentPassword
+        )
+
+    ) {
+
+
+        showError(
+            'Incorrect Staff Password.'
+        );
+
+
+        return;
+
+    }
+
+
+    /* -----------------------------------------------
+       SAVE STAFF SESSION
+
+       BOTH STORAGE TYPES FOR COMPATIBILITY
+    ------------------------------------------------ */
+
+
+    localStorage.setItem(
+        'userRole',
+        'teacher'
+    );
+
+
+    localStorage.setItem(
+        'loggedInUser',
+        teacherName
+    );
+
+
+    sessionStorage.setItem(
+        'userRole',
+        'teacher'
+    );
+
+
+    sessionStorage.setItem(
+        'loggedInUser',
+        teacherName
+    );
+
+
+    showSuccess(
+        'Login successful. Opening Staff Portal...'
+    );
+
+
+    setTimeout(
+
+        function () {
+
+            window.location.replace(
+                './staff.html'
+            );
+
+        },
+
+        300
+
+    );
+
+}
+
+
+/* =====================================================
+   SAVE NEW STAFF PASSWORD
+===================================================== */
+
+
+async function saveNewStaffPassword() {
+
+
+    clearMessages();
+
+
+    const newPassword =
+
+        document.getElementById(
+            'new-password'
+        ).value.trim();
+
+
+    const confirmPassword =
+
+        document.getElementById(
+            'confirm-password'
+        ).value.trim();
+
+
+    if (
+        !newPassword
+        ||
+        !confirmPassword
+    ) {
+
+        showError(
+            'Please enter and confirm your new password.'
+        );
+
+        return;
+
+    }
+
+
+    if (
+        newPassword.length <
+        4
+    ) {
+
+        showError(
+            'Password must contain at least 4 characters.'
+        );
+
+        return;
+
+    }
+
+
+    if (
+        newPassword ===
+        '1234'
+    ) {
+
+        showError(
+            'Please choose a password different from 1234.'
+        );
+
+        return;
+
+    }
+
+
+    if (
+        newPassword !==
+        confirmPassword
+    ) {
+
+        showError(
+            'New passwords do not match.'
+        );
+
+        return;
+
+    }
+
+
+    if (
+        !currentStaffName
+    ) {
+
+        showError(
+            'Staff session expired. Please login again.'
+        );
+
+        return;
+
+    }
+
+
+    try {
+
+
+        const {
+
+            data,
+
+            error
+
+        } =
+
+            await supabaseClient
+
+            .from(
+                'exam_db'
+            )
+
+            .select(
+                'id, data_key, json_payload'
+            )
+
+            .eq(
+                'data_key',
+                'credentials'
+            )
+
+            .limit(
+                1
+            );
+
+
+        if (
+            error
+        ) {
+
+            throw error;
+
+        }
+
+
+        let credentials =
+            {};
+
+
+        let recordId =
+            null;
+
+
+        if (
+
+            data
+
+            &&
+
+            data.length >
+            0
+
+        ) {
+
+
+            recordId =
+                data[0].id;
+
+
+            if (
+
+                data[0].json_payload
+
+                &&
+
+                typeof data[0].json_payload ===
+                'object'
+
+                &&
+
+                !Array.isArray(
+                    data[0].json_payload
+                )
+
+            ) {
+
+                credentials =
+                    data[0].json_payload;
+
+            }
+
+        }
+
+
+        credentials[
+            currentStaffName
+        ] = {
+
+            password:
+                newPassword,
+
+            passwordChanged:
+                true
+
+        };
+
+
+        if (
+            recordId
+        ) {
+
+
+            const {
+
+                error:
+                updateError
+
+            } =
+
+                await supabaseClient
+
+                .from(
+                    'exam_db'
+                )
+
+                .update({
+
+                    json_payload:
+                        credentials
+
+                })
+
+                .eq(
+                    'id',
+                    recordId
+                );
+
+
+            if (
+                updateError
+            ) {
+
+                throw updateError;
+
+            }
+
+        }
+
+
+        else {
+
+
+            const {
+
+                error:
+                insertError
+
+            } =
+
+                await supabaseClient
+
+                .from(
+                    'exam_db'
+                )
+
+                .insert({
+
+                    data_key:
+                        'credentials',
+
+                    json_payload:
+                        credentials
+
+                });
+
+
+            if (
+                insertError
+            ) {
+
+                throw insertError;
+
+            }
+
+        }
+
+
+        /* -------------------------------------------
+           SAVE STAFF SESSION
+        -------------------------------------------- */
+
+
+        localStorage.setItem(
+            'userRole',
+            'teacher'
+        );
+
+
+        localStorage.setItem(
+            'loggedInUser',
+            currentStaffName
+        );
+
+
+        sessionStorage.setItem(
+            'userRole',
+            'teacher'
+        );
+
+
+        sessionStorage.setItem(
+            'loggedInUser',
+            currentStaffName
+        );
+
+
+        showSuccess(
+
+            'Password saved successfully. Opening Staff Portal...'
+
+        );
+
+
+        setTimeout(
+
+            function () {
+
+                window.location.replace(
+                    './staff.html'
+                );
+
+            },
+
+            500
+
+        );
+
+
+    }
+
+    catch (
+        error
+    ) {
+
+
+        console.error(
+            'Password save error:',
+            error
+        );
+
+
+        showError(
+
+            'Unable to save password: ' +
+
+            (
+                error.message
+                ||
+                'Unknown error'
+            )
+
+        );
+
+    }
+
+}
+
+
+/* =====================================================
+   INITIALIZE APPLICATION
+===================================================== */
+
+
+document.addEventListener(
+
+    'DOMContentLoaded',
+
+    async function () {
+
+
+        try {
+
+
+            if (
+
+                typeof supabaseClient ===
+                'undefined'
+
+            ) {
+
+                throw new Error(
+
+                    'Supabase client is not initialized. Check supabase-config.js.'
+
+                );
+
+            }
+
+
+            /* -----------------------------------------
+               LOAD ADMIN SCHOOLS
+            ------------------------------------------ */
+
+
+            await loadSchools();
+
+
+            /* -----------------------------------------
+               LOAD STAFF DATA
+            ------------------------------------------ */
+
+
+            await loadStaff();
+
+
+            /* -----------------------------------------
+               CONNECTION SUCCESS
+            ------------------------------------------ */
+
+
+            const status =
+
+                document.getElementById(
+                    'connection-status'
+                );
+
+
+            status.textContent =
+
+                '✓ Database Connected';
+
+
+            status.className =
+
+                'status-success';
+
+
+        }
+
+
+        catch (
+            error
+        ) {
+
+
+            console.error(
+                'Initialization Error:',
+                error
+            );
+
+
+            const status =
+
+                document.getElementById(
+                    'connection-status'
+                );
+
+
+            status.textContent =
+
+                '✕ Database Connection Failed';
+
+
+            status.className =
+
+                'status-error';
+
+
+            showError(
+
+                error.message
+
+                ||
+
+                'Unable to connect to database.'
+
+            );
+
+        }
+
+    }
+
+);
+
+</script>
+
+</body>
+
+</html>
