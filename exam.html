@@ -283,11 +283,20 @@
         let ctxSelectedDate = null;
 
         // INITIALIZATION
+
+        // INITIALIZATION
         window.addEventListener('DOMContentLoaded', async () => {
-            // Force Admin role and School ID 1 if missing
-            let role = sessionStorage.getItem('userRole') || localStorage.getItem('userRole') || 'admin'; 
-            globalSchoolId = sessionStorage.getItem('schoolId') || localStorage.getItem('schoolId') || '1';
-            savedSchoolName = sessionStorage.getItem('schoolName') || localStorage.getItem('schoolName') || "Patkabari High School";
+            // STRICT SECURITY: Fetch credentials properly without falling back to '1'
+            let role = sessionStorage.getItem('userRole') || localStorage.getItem('userRole'); 
+            globalSchoolId = sessionStorage.getItem('schoolId') || localStorage.getItem('schoolId');
+            savedSchoolName = sessionStorage.getItem('schoolName') || localStorage.getItem('schoolName') || "Exam Center";
+
+            // Enforce strict security to prevent fetching the wrong school's data
+            if (!globalSchoolId || globalSchoolId === 'undefined' || globalSchoolId === 'null') {
+                alert("Unauthorized Access or Session Expired. Redirecting to login...");
+                window.location.href = 'index.html'; 
+                return;
+            }
 
             document.getElementById('examSchoolNameDisplay').textContent = savedSchoolName;
             await fetchExamData();
@@ -1729,13 +1738,16 @@
         /* =====================================================
            FEATURE 4: PROFESSIONAL A4 LANDSCAPE ROOM STICKERS
         ==================================================== */
+/* =====================================================
+           FEATURE 4: PROFESSIONAL MINIMALIST ROOM STICKERS
+        ==================================================== */
         function printRoomStickers() {
             const checkedIds = Array.from(document.querySelectorAll('.sticker-room-chk:checked')).map(cb => cb.value);
             if (checkedIds.length === 0) return alert("Select at least one room to print.");
 
             let roomsToPrint = roomConfigsCache.filter(r => checkedIds.includes(r.id));
             
-            // Generate full bleed A4 Landscape Stickers
+            // Generate full bleed A4 Landscape Stickers with NO borders and HUGE digits
             let fullHtml = `<html><head><title>A4 Room Stickers</title><style>
                 @page { size: A4 landscape; margin: 0; }
                 body { font-family: 'Helvetica Neue', Arial, sans-serif; margin:0; padding:0; color: #000; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; background: #fff;}
@@ -1743,26 +1755,16 @@
                 .a4-landscape { 
                     width: 297mm; height: 209mm; margin: 0 auto;
                     box-sizing: border-box; padding: 15mm; 
-                    page-break-after: always; display: flex; flex-direction: column; 
+                    page-break-after: always; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center;
                 }
                 .a4-landscape:last-child { page-break-after: auto; }
                 
-                .sticker-border {
-                    border: 6px solid #1e3a8a; border-radius: 20px; padding: 25px; 
-                    flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center;
-                    position: relative; overflow: hidden; box-shadow: inset 0 0 0 2px #93c5fd;
-                }
+                .room-label { font-size: 38px; font-weight: bold; color: #333; margin-top: 0; margin-bottom: -10px; text-transform: uppercase; letter-spacing: 10px; }
+                .room-name { font-size: 280px; font-weight: 900; margin: 0; color: #000; text-transform: uppercase; letter-spacing: 5px; line-height: 1; }
                 
-                .school-name { font-size: 52px; font-weight: 900; text-transform: uppercase; margin-bottom: 10px; padding-bottom: 15px; border-bottom: 5px solid #1e3a8a; width: 95%; letter-spacing: 2px; line-height: 1.1; color: #1e3a8a; }
-                .room-label { font-size: 28px; font-weight: bold; color: #64748b; margin-top: 15px; text-transform: uppercase; letter-spacing: 6px; }
-                .room-name { font-size: 140px; font-weight: 900; margin: 0 0 15px 0; color: #0f172a; text-transform: uppercase; letter-spacing: 5px; line-height: 1; text-shadow: 4px 4px 0px rgba(0,0,0,0.05); }
-                
-                .details-table { width: 95%; border-collapse: collapse; margin-top: 15px; font-size: 32px; font-weight: bold; }
-                .details-table th, .details-table td { border: 4px solid #334155; padding: 12px 20px; text-align: center; }
-                .details-table th { background: #e2e8f0 !important; text-transform: uppercase; color: #0f172a; font-weight: 900; }
-                
-                .footer-meta { position: absolute; bottom: 20px; width: 95%; display: flex; justify-content: space-between; font-size: 24px; font-weight: 900; color: #475569; }
-                .footer-meta span { background: #f1f5f9; padding: 5px 15px; border-radius: 10px; border: 2px solid #cbd5e1;}
+                .details-table { width: 95%; border-collapse: collapse; margin-top: 25px; font-size: 38px; font-weight: bold; }
+                .details-table th, .details-table td { border: 4px solid #000; padding: 18px 20px; text-align: center; }
+                .details-table th { background: #e2e8f0 !important; text-transform: uppercase; color: #000; font-weight: 900; }
                 
                 @media print { .no-print { display: none !important; } }
             </style></head><body>`;
@@ -1788,29 +1790,21 @@
 
                 fullHtml += `
                     <div class="a4-landscape">
-                        <div class="sticker-border">
-                            <div class="school-name">${savedSchoolName}</div>
-                            <div class="room-label">Seating Arrangement</div>
-                            <div class="room-name">${room.name}</div>
-                            
-                            <table class="details-table">
-                                <thead>
-                                    <tr>
-                                        <th style="width:25%">Class</th>
-                                        <th style="width:50%">Roll Numbers</th>
-                                        <th style="width:25%">Total</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    ${classRows}
-                                </tbody>
-                            </table>
-                            
-                            <div class="footer-meta">
-                                <span>Type: ${room.gender.toUpperCase()}</span>
-                                <span>Max Capacity: ${room.totalCapacity}</span>
-                            </div>
-                        </div>
+                        <div class="room-label">Seating Arrangement</div>
+                        <div class="room-name">${room.name}</div>
+                        
+                        <table class="details-table">
+                            <thead>
+                                <tr>
+                                    <th style="width:25%">Class</th>
+                                    <th style="width:50%">Roll Numbers</th>
+                                    <th style="width:25%">Total</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${classRows}
+                            </tbody>
+                        </table>
                     </div>
                 `;
             });
@@ -1821,7 +1815,6 @@
             w.document.close();
             setTimeout(() => { w.print(); }, 800);
         }
-
         /* =====================================================
            PRINT: DUTY ROSTER
         ==================================================== */
