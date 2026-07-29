@@ -22,7 +22,7 @@
         .calendar-cell { min-height: 80px; transition: all 0.2s; position: relative; }
         
         /* Custom Context Menu */
-        #customContextMenu { position: fixed; z-index: 99999; display: none; }
+        #customContextMenu { position: fixed; z-index: 99999; display: none; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05); }
 
         @media print {
             body * { visibility: hidden; }
@@ -142,14 +142,31 @@
         </div>
     </div>
 
-    <!-- 4. MANUAL EXAM ENTRY MODAL -->
-    <div id="manualExamModal" class="fixed inset-0 bg-slate-900/80 hidden z-[60] flex items-center justify-center backdrop-blur-sm no-print p-2 md:p-4">
+    <!-- 4. DAY DETAILS MODAL (FOR VIEW/EDIT/DELETE CALENDAR ITEMS) -->
+    <div id="dayDetailsModal" class="fixed inset-0 bg-slate-900/80 hidden z-[60] flex items-center justify-center backdrop-blur-sm no-print p-2 md:p-4">
+        <div class="bg-white p-4 md:p-6 rounded-2xl shadow-xl max-w-md w-full flex flex-col max-h-[90vh] border-t-4 border-indigo-500">
+            <div class="flex justify-between items-center mb-4 border-b pb-2 shrink-0">
+                <h3 class="text-base md:text-lg font-black text-slate-800" id="dayDetailsTitle">Day Details</h3>
+                <button onclick="closeModal('dayDetailsModal')" class="text-slate-400 hover:text-rose-600 text-2xl">&times;</button>
+            </div>
+            <div class="flex-1 overflow-y-auto custom-scroll pr-1 flex flex-col gap-2" id="dayDetailsList">
+            </div>
+            <div class="flex gap-2 border-t pt-4 mt-2 shrink-0">
+                <button onclick="openManualExamModal(null, ctxSelectedDate)" class="flex-1 bg-teal-600 hover:bg-teal-700 text-white font-bold py-2 rounded text-xs shadow-md transition-colors"><i class="fas fa-plus mr-1"></i> Add Exam</button>
+                <button onclick="openManualEventModal(null, ctxSelectedDate)" class="flex-1 bg-amber-500 hover:bg-amber-600 text-white font-bold py-2 rounded text-xs shadow-md transition-colors"><i class="fas fa-calendar-plus mr-1"></i> Add Event</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 5. MANUAL EXAM ENTRY MODAL -->
+    <div id="manualExamModal" class="fixed inset-0 bg-slate-900/80 hidden z-[70] flex items-center justify-center backdrop-blur-sm no-print p-2 md:p-4">
         <div class="bg-white p-4 md:p-6 rounded-2xl shadow-xl max-w-sm w-full flex flex-col max-h-[90vh] border-t-4 border-teal-500">
             <div class="flex justify-between items-center mb-4 border-b pb-2 shrink-0">
-                <h3 class="text-base md:text-lg font-black text-slate-800"><i class="fas fa-plus-circle text-teal-500 mr-2"></i> Add Manual Exam</h3>
+                <h3 class="text-base md:text-lg font-black text-slate-800"><i class="fas fa-file-alt text-teal-500 mr-2"></i> Add/Edit Exam</h3>
                 <button onclick="closeModal('manualExamModal')" class="text-slate-400 hover:text-rose-600 text-2xl">&times;</button>
             </div>
             <div class="flex-1 overflow-y-auto custom-scroll pr-1 flex flex-col gap-3">
+                <input type="hidden" id="manExamId">
                 <div>
                     <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Date</label>
                     <input type="date" id="manExamDate" class="w-full p-2 border border-slate-300 rounded font-bold text-slate-700 outline-none focus:border-teal-500 bg-slate-50">
@@ -172,16 +189,72 @@
                 </div>
             </div>
             <div class="flex gap-2 border-t pt-4 mt-2 shrink-0">
-                <button onclick="saveManualExam()" class="w-full bg-teal-600 hover:bg-teal-700 text-white font-bold py-2 rounded text-xs shadow-md transition-colors"><i class="fas fa-save mr-1"></i> Save to Schedule</button>
+                <button onclick="saveManualExam()" class="w-full bg-teal-600 hover:bg-teal-700 text-white font-bold py-2 rounded text-xs shadow-md transition-colors"><i class="fas fa-save mr-1"></i> Save Exam</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 6. MANUAL EVENT ENTRY MODAL -->
+    <div id="manualEventModal" class="fixed inset-0 bg-slate-900/80 hidden z-[70] flex items-center justify-center backdrop-blur-sm no-print p-2 md:p-4">
+        <div class="bg-white p-4 md:p-6 rounded-2xl shadow-xl max-w-sm w-full flex flex-col max-h-[90vh] border-t-4 border-amber-500">
+            <div class="flex justify-between items-center mb-4 border-b pb-2 shrink-0">
+                <h3 class="text-base md:text-lg font-black text-slate-800"><i class="fas fa-calendar-check text-amber-500 mr-2"></i> Add/Edit Event</h3>
+                <button onclick="closeModal('manualEventModal')" class="text-slate-400 hover:text-rose-600 text-2xl">&times;</button>
+            </div>
+            <div class="flex-1 overflow-y-auto custom-scroll pr-1 flex flex-col gap-3">
+                <input type="hidden" id="manEventId">
+                <div>
+                    <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Date</label>
+                    <input type="date" id="manEventDate" class="w-full p-2 border border-slate-300 rounded font-bold text-slate-700 outline-none focus:border-amber-500 bg-slate-50">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Time</label>
+                    <input type="text" id="manEventTime" placeholder="e.g. 10:00 AM or All Day" class="w-full p-2 border border-slate-300 rounded font-bold text-slate-700 outline-none focus:border-amber-500 bg-slate-50">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Event Title</label>
+                    <input type="text" id="manEventTitle" placeholder="e.g. Staff Meeting" class="w-full p-2 border border-slate-300 rounded font-bold text-slate-700 outline-none focus:border-amber-500 bg-slate-50">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Description / Notes</label>
+                    <textarea id="manEventDesc" rows="3" placeholder="Notes..." class="w-full p-2 border border-slate-300 rounded font-bold text-slate-700 outline-none focus:border-amber-500 bg-slate-50"></textarea>
+                </div>
+            </div>
+            <div class="flex gap-2 border-t pt-4 mt-2 shrink-0">
+                <button onclick="saveManualEvent()" class="w-full bg-amber-500 hover:bg-amber-600 text-white font-bold py-2 rounded text-xs shadow-md transition-colors"><i class="fas fa-save mr-1"></i> Save Event</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 7. CALENDAR PRINT MODAL -->
+    <div id="printCalendarModal" class="fixed inset-0 bg-slate-900/80 hidden z-[60] flex items-center justify-center backdrop-blur-sm no-print p-2 md:p-4">
+        <div class="bg-white p-4 md:p-6 rounded-2xl shadow-xl max-w-sm w-full flex flex-col max-h-[90vh] border-t-4 border-indigo-500">
+            <div class="flex justify-between items-center mb-4 border-b pb-2 shrink-0">
+                <h3 class="text-base md:text-lg font-black text-slate-800"><i class="fas fa-print text-indigo-500 mr-2"></i> Print Academic Calendar</h3>
+                <button onclick="closeModal('printCalendarModal')" class="text-slate-400 hover:text-rose-600 text-2xl">&times;</button>
+            </div>
+            <div class="flex flex-col gap-3">
+                <label class="block text-xs font-bold text-slate-700">Filter Output:</label>
+                <select id="calPrintFilter" class="w-full p-2 border border-slate-300 rounded outline-none font-bold text-slate-700 bg-slate-50">
+                    <option value="all">All Data (Exams + Events)</option>
+                    <option value="exams">Exams Only</option>
+                    <option value="events">Events Only</option>
+                </select>
+            </div>
+            <div class="flex gap-2 border-t pt-4 mt-4 shrink-0">
+                <button onclick="executeCalendarPrint()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 rounded text-xs shadow-md transition-colors"><i class="fas fa-print mr-1"></i> Generate Print View</button>
             </div>
         </div>
     </div>
 
     <!-- CUSTOM CONTEXT MENU (RIGHT CLICK) -->
-    <div id="customContextMenu" class="bg-white border border-slate-200 rounded-lg shadow-xl w-48 overflow-hidden text-sm">
-        <div class="px-3 py-2 bg-slate-100 text-[10px] font-bold text-slate-500 uppercase border-b border-slate-200" id="ctxMenuDate">Date Options</div>
-        <button onclick="openManualExamModalFromCtx()" class="w-full text-left px-4 py-2.5 text-slate-700 hover:bg-teal-50 hover:text-teal-700 transition-colors font-semibold flex items-center">
-            <i class="fas fa-calendar-plus w-5 text-center text-teal-500 mr-2"></i> Add Exam Here
+    <div id="customContextMenu" class="bg-white border border-slate-200 rounded-lg w-48 overflow-hidden text-sm">
+        <div class="px-3 py-2 bg-slate-100 text-[10px] font-bold text-slate-500 uppercase border-b border-slate-200" id="ctxMenuDate">Options</div>
+        <button onclick="openManualExamModal(null, ctxSelectedDate)" class="w-full text-left px-4 py-2.5 text-slate-700 hover:bg-teal-50 hover:text-teal-700 transition-colors font-semibold flex items-center border-b border-slate-100">
+            <i class="fas fa-file-alt w-5 text-center text-teal-500 mr-2"></i> Add Exam
+        </button>
+        <button onclick="openManualEventModal(null, ctxSelectedDate)" class="w-full text-left px-4 py-2.5 text-slate-700 hover:bg-amber-50 hover:text-amber-700 transition-colors font-semibold flex items-center">
+            <i class="fas fa-calendar-check w-5 text-center text-amber-500 mr-2"></i> Add Event
         </button>
     </div>
 
@@ -199,7 +272,7 @@
         
         let teachersCache = [];
         let roomConfigsCache = [];
-        let scheduleCache = []; 
+        let scheduleCache = []; // Now holds both 'exam' and 'event' objects
         let dutyRecordsCache = {}; 
         let absenteesCache = {};
         let recordIds = { rooms: null, schedule: null, duty: null, absentees: null, teachers: null };
@@ -211,13 +284,12 @@
 
         // INITIALIZATION
         window.addEventListener('DOMContentLoaded', async () => {
-            // Force Admin role and School ID 1 if they are missing (Bypass Login for Public Template)
+            // Force Admin role and School ID 1 if missing
             let role = sessionStorage.getItem('userRole') || localStorage.getItem('userRole') || 'admin'; 
             globalSchoolId = sessionStorage.getItem('schoolId') || localStorage.getItem('schoolId') || '1';
             savedSchoolName = sessionStorage.getItem('schoolName') || localStorage.getItem('schoolName') || "Patkabari High School";
 
             document.getElementById('examSchoolNameDisplay').textContent = savedSchoolName;
-
             await fetchExamData();
             renderView('setup'); 
         });
@@ -239,10 +311,9 @@
                     data.forEach(row => {
                         let payload = row.json_payload;
                         if (typeof payload === 'string') { 
-                            try { payload = JSON.parse(payload); } catch(e) { console.error("Parse Error"); } 
+                            try { payload = JSON.parse(payload); } catch(e) {} 
                         }
                         
-                        // Sanitize to handle legacy array wrapping
                         if (row.data_key === 'teachers' || row.data_key === 'staff') { 
                             teachersCache = Array.isArray(payload) ? payload.map(t => typeof t === 'object' && t !== null ? t.name : t).filter(Boolean) : [];
                             recordIds.teachers = row.id; 
@@ -300,7 +371,7 @@
                                 <div class="bg-white p-4 rounded-lg border border-slate-200 shadow-sm flex flex-col">
                                     <h3 class="text-[10px] md:text-xs font-bold text-slate-700 uppercase tracking-wide mb-3 flex items-center justify-between">
                                         <span>1. Rooms</span>
-                                        <button onclick="downloadCSV('rooms')" class="text-indigo-600 hover:text-indigo-800 bg-indigo-50 px-2 py-1 rounded" title="Download Current Data Template"><i class="fas fa-download mr-1"></i> Data</button>
+                                        <button onclick="downloadCSV('rooms')" class="text-indigo-600 hover:text-indigo-800 bg-indigo-50 px-2 py-1 rounded" title="Download Current Data"><i class="fas fa-download mr-1"></i> Backup</button>
                                     </h3>
                                     <input type="file" id="csvRooms" accept=".csv" class="w-full text-xs text-slate-500 mb-3 border p-1 rounded cursor-pointer">
                                     <button onclick="processCSV('rooms')" class="w-full mt-auto bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 rounded shadow-sm text-xs transition-colors"><i class="fas fa-upload mr-1"></i> Sync Rooms</button>
@@ -308,8 +379,8 @@
                                 
                                 <div class="bg-white p-4 rounded-lg border border-slate-200 shadow-sm flex flex-col">
                                     <h3 class="text-[10px] md:text-xs font-bold text-slate-700 uppercase tracking-wide mb-3 flex items-center justify-between">
-                                        <span>2. Schedule</span>
-                                        <button onclick="downloadCSV('schedule')" class="text-teal-600 hover:text-teal-800 bg-teal-50 px-2 py-1 rounded" title="Download Current Data Template"><i class="fas fa-download mr-1"></i> Data</button>
+                                        <span>2. Schedule/Events</span>
+                                        <button onclick="downloadCSV('schedule')" class="text-teal-600 hover:text-teal-800 bg-teal-50 px-2 py-1 rounded" title="Download Current Data"><i class="fas fa-download mr-1"></i> Backup</button>
                                     </h3>
                                     <input type="file" id="csvSchedule" accept=".csv" class="w-full text-xs text-slate-500 mb-3 border p-1 rounded cursor-pointer">
                                     <button onclick="processCSV('schedule')" class="w-full mt-auto bg-teal-600 hover:bg-teal-700 text-white font-bold py-2 rounded shadow-sm text-xs transition-colors"><i class="fas fa-upload mr-1"></i> Sync Schedule</button>
@@ -318,7 +389,7 @@
                                 <div class="bg-white p-4 rounded-lg border border-slate-200 shadow-sm flex flex-col">
                                     <h3 class="text-[10px] md:text-xs font-bold text-slate-700 uppercase tracking-wide mb-3 flex items-center justify-between">
                                         <span>3. Staff</span>
-                                        <button onclick="downloadCSV('staff')" class="text-purple-600 hover:text-purple-800 bg-purple-50 px-2 py-1 rounded" title="Download Current Data Template"><i class="fas fa-download mr-1"></i> Data</button>
+                                        <button onclick="downloadCSV('staff')" class="text-purple-600 hover:text-purple-800 bg-purple-50 px-2 py-1 rounded" title="Download Current Data"><i class="fas fa-download mr-1"></i> Backup</button>
                                     </h3>
                                     <input type="file" id="csvStaff" accept=".csv" class="w-full text-xs text-slate-500 mb-3 border p-1 rounded cursor-pointer">
                                     <button onclick="processCSV('staff')" class="w-full mt-auto bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 rounded shadow-sm text-xs transition-colors"><i class="fas fa-upload mr-1"></i> Sync Staff</button>
@@ -329,7 +400,7 @@
                         <!-- SYNCHRONIZED DATA VIEWER -->
                         <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                             <div class="bg-slate-100 p-3 md:p-4 border-b border-slate-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-                                <h2 class="font-black text-slate-800 text-sm md:text-base"><i class="fas fa-database mr-2 text-indigo-500"></i> Active Database</h2>
+                                <h2 class="font-black text-slate-800 text-sm md:text-base"><i class="fas fa-calendar-alt mr-2 text-indigo-500"></i> Master Planner</h2>
                                 <div class="flex gap-2 w-full sm:w-auto overflow-x-auto no-scrollbar pb-1 sm:pb-0">
                                     <button onclick="switchSetupTab('schedule')" id="tab-setup-schedule" class="bg-indigo-600 text-white px-3 py-1.5 rounded font-bold text-[10px] md:text-xs shadow-sm transition-colors whitespace-nowrap">📅 Visual Calendar</button>
                                     <button onclick="switchSetupTab('rooms')" id="tab-setup-rooms" class="bg-slate-200 text-slate-700 hover:bg-slate-300 px-3 py-1.5 rounded font-bold text-[10px] md:text-xs shadow-sm transition-colors whitespace-nowrap">🏫 Manage Rooms</button>
@@ -343,18 +414,10 @@
                 `;
                 setTimeout(() => switchSetupTab('schedule'), 50);
             } 
-            else if (viewName === 'duty') {
-                buildDutyBoard(workspace);
-            } 
-            else if (viewName === 'checker') {
-                renderChecker(workspace);
-            }
-            else if (viewName === 'stickers') {
-                renderRoomStickers(workspace);
-            }
-            else if (viewName === 'report') {
-                renderDutyReport(workspace);
-            }
+            else if (viewName === 'duty') { buildDutyBoard(workspace); } 
+            else if (viewName === 'checker') { renderChecker(workspace); }
+            else if (viewName === 'stickers') { renderRoomStickers(workspace); }
+            else if (viewName === 'report') { renderDutyReport(workspace); }
         }
 
         /* =====================================================
@@ -367,13 +430,16 @@
                 roomConfigsCache.forEach(r => {
                     let cap = r.totalCapacity || 0;
                     let cls = (r.classesList || []).join(';');
-                    // Include roll mapping logic if needed, but basic upload matches 4 columns
                     csv += `"${r.name}","${r.gender}",${cap},"${cls}"\n`;
                 });
             } else if (type === 'schedule') {
-                csv += 'Date,Time,Classes,Subject,Exam Name\n';
+                csv += 'Date,Time,Classes_Or_Title,Subject_Or_Description,Exam_Name,Type\n';
                 scheduleCache.forEach(s => {
-                    csv += `"${s.date}","${s.time}","${s.classes}","${s.subject}","${s.examName}"\n`;
+                    let typeVal = s.type || 'exam';
+                    let col3 = typeVal === 'exam' ? (s.classes || '') : (s.title || '');
+                    let col4 = typeVal === 'exam' ? (s.subject || '') : (s.description || '');
+                    let col5 = typeVal === 'exam' ? (s.examName || '') : '';
+                    csv += `"${s.date}","${s.time || ''}","${col3}","${col4}","${col5}","${typeVal}"\n`;
                 });
             } else if (type === 'staff') {
                 csv += 'Name\n';
@@ -384,7 +450,7 @@
             let link = document.createElement("a");
             let url = URL.createObjectURL(blob);
             link.setAttribute("href", url);
-            link.setAttribute("download", `${savedSchoolName.replace(/\s+/g,'_')}_${type}_template.csv`);
+            link.setAttribute("download", `${savedSchoolName.replace(/\s+/g,'_')}_${type}_backup.csv`);
             link.style.visibility = 'hidden';
             document.body.appendChild(link);
             link.click();
@@ -410,7 +476,7 @@
         }
 
         /* =====================================================
-           FEATURE 2 & 3: VISUAL CALENDAR & PRINT SCHEDULE
+           FEATURE 2 & 3: VISUAL CALENDAR, CONTEXT MENU, & PRINTING
         ==================================================== */
         function changeCalMonth(offset) {
             currentCalMonth += offset;
@@ -421,34 +487,31 @@
 
         function renderVisualCalendar() {
             const container = document.getElementById('setup-data-container');
-            
             const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
             const daysInMonth = new Date(currentCalYear, currentCalMonth + 1, 0).getDate();
             const firstDayIndex = new Date(currentCalYear, currentCalMonth, 1).getDay();
 
-            // Group schedule by date
+            // Group items by date
             let grouped = {};
             scheduleCache.forEach(s => {
                 if(!grouped[s.date]) grouped[s.date] = [];
                 grouped[s.date].push(s);
             });
 
-            // Build Top Bar with Print Buttons
+            // Build Top Bar
             let html = `
-                <div class="flex flex-col sm:flex-row justify-between items-center mb-4 gap-3 bg-white p-3 rounded-lg border border-slate-200 shadow-sm">
+                <div class="flex flex-col md:flex-row justify-between items-center mb-4 gap-3 bg-white p-3 rounded-lg border border-slate-200 shadow-sm">
                     <div class="flex items-center gap-4">
                         <button onclick="changeCalMonth(-1)" class="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center justify-center transition-colors"><i class="fas fa-chevron-left"></i></button>
                         <h3 class="font-black text-lg md:text-xl text-indigo-900 w-40 text-center">${monthNames[currentCalMonth]} ${currentCalYear}</h3>
                         <button onclick="changeCalMonth(1)" class="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center justify-center transition-colors"><i class="fas fa-chevron-right"></i></button>
                     </div>
                     <div class="flex gap-2">
-                        <button onclick="printSchoolSchedule()" class="bg-indigo-100 text-indigo-800 hover:bg-indigo-200 px-3 py-1.5 rounded shadow-sm text-[10px] md:text-xs font-bold transition-colors border border-indigo-200"><i class="fas fa-print mr-1"></i> Print All</button>
-                        <button onclick="printClassSchedulePrompt()" class="bg-teal-100 text-teal-800 hover:bg-teal-200 px-3 py-1.5 rounded shadow-sm text-[10px] md:text-xs font-bold transition-colors border border-teal-200"><i class="fas fa-filter mr-1"></i> Class-wise</button>
+                        <button onclick="openPrintCalendarModal()" class="bg-indigo-100 text-indigo-800 hover:bg-indigo-200 px-3 py-1.5 rounded shadow-sm text-[10px] md:text-xs font-bold transition-colors border border-indigo-200"><i class="fas fa-print mr-1"></i> Print Calendar Data</button>
                     </div>
                 </div>
-                <div class="text-[10px] md:text-xs text-slate-500 italic mb-2 text-center md:text-left"><i class="fas fa-info-circle text-indigo-400 mr-1"></i> Tip: Right-click (or long-press) any day to manually add an exam without a CSV. Click a day to view details.</div>
+                <div class="text-[10px] md:text-xs text-slate-500 italic mb-2 text-center md:text-left"><i class="fas fa-info-circle text-indigo-400 mr-1"></i> Tip: Right-click (or long-press on mobile) any day to manually add an exam or event. Click a day to view/edit details.</div>
                 
-                <!-- Calendar Grid -->
                 <div class="bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden">
                     <div class="grid grid-cols-7 bg-slate-100 text-slate-600 font-bold text-center text-[10px] md:text-xs uppercase tracking-wider">
                         <div class="py-2 border-b border-r">Sun</div><div class="py-2 border-b border-r">Mon</div><div class="py-2 border-b border-r">Tue</div>
@@ -458,41 +521,43 @@
                     <div class="grid grid-cols-7">
             `;
 
-            // Blanks
             for (let i = 0; i < firstDayIndex; i++) {
                 html += `<div class="calendar-cell bg-slate-50 border-r border-b border-slate-100 opacity-50"></div>`;
             }
 
-            // Days
             for (let day = 1; day <= daysInMonth; day++) {
                 let dateStr = `${currentCalYear}-${String(currentCalMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-                let dayExams = grouped[dateStr] || [];
+                let dayItems = grouped[dateStr] || [];
                 
-                let examBadges = '';
-                if (dayExams.length > 0) {
-                    examBadges = `<div class="mt-1 flex flex-col gap-1">`;
-                    // Show max 2 badges, then a count
-                    dayExams.slice(0, 2).forEach(e => {
-                        examBadges += `<span class="bg-teal-100 text-teal-800 text-[8px] md:text-[9px] font-bold px-1 py-0.5 rounded truncate border border-teal-200" title="${e.subject}">${e.subject}</span>`;
+                let badges = '';
+                if (dayItems.length > 0) {
+                    badges = `<div class="mt-1 flex flex-col gap-1">`;
+                    dayItems.slice(0, 2).forEach(item => {
+                        let isExam = (!item.type || item.type === 'exam');
+                        if (isExam) {
+                            badges += `<span class="bg-teal-100 text-teal-800 text-[8px] md:text-[9px] font-bold px-1 py-0.5 rounded truncate border border-teal-200 shadow-sm" title="${item.subject}"><i class="fas fa-file-alt mr-1 opacity-50"></i>${item.subject || 'Exam'}</span>`;
+                        } else {
+                            badges += `<span class="bg-amber-100 text-amber-800 text-[8px] md:text-[9px] font-bold px-1 py-0.5 rounded truncate border border-amber-200 shadow-sm" title="${item.title}"><i class="fas fa-calendar-check mr-1 opacity-50"></i>${item.title || 'Event'}</span>`;
+                        }
                     });
-                    if (dayExams.length > 2) {
-                        examBadges += `<span class="text-[8px] font-black text-slate-500 text-center">+${dayExams.length - 2} more</span>`;
+                    if (dayItems.length > 2) {
+                        badges += `<span class="text-[8px] font-black text-slate-500 text-center">+${dayItems.length - 2} more</span>`;
                     }
-                    examBadges += `</div>`;
+                    badges += `</div>`;
                 }
 
-                let bgClass = dayExams.length > 0 ? 'bg-indigo-50/30' : 'bg-white';
-                let borderClass = dayExams.length > 0 ? 'border-indigo-200' : 'border-slate-100';
+                let bgClass = dayItems.length > 0 ? 'bg-indigo-50/20' : 'bg-white';
+                let borderClass = dayItems.length > 0 ? 'border-indigo-200' : 'border-slate-100';
 
                 html += `
-                    <div class="calendar-cell ${bgClass} border-r border-b ${borderClass} p-1 md:p-2 cursor-pointer hover:bg-slate-100 transition-colors group" 
+                    <div class="calendar-cell ${bgClass} border-r border-b ${borderClass} p-1 md:p-2 cursor-pointer hover:bg-slate-50 transition-colors group" 
                          onclick="showExamsForDay('${dateStr}')"
                          oncontextmenu="handleCalendarRightClick(event, '${dateStr}')">
                         <div class="flex justify-between items-start">
                             <span class="font-bold text-slate-700 text-xs md:text-sm group-hover:text-indigo-600">${day}</span>
-                            ${dayExams.length > 0 ? `<i class="fas fa-circle text-teal-500 text-[6px] mt-1 hidden md:block"></i>` : ''}
+                            ${dayItems.length > 0 ? `<i class="fas fa-circle text-indigo-400 text-[6px] mt-1 hidden md:block"></i>` : ''}
                         </div>
-                        ${examBadges}
+                        ${badges}
                     </div>
                 `;
             }
@@ -503,20 +568,15 @@
 
         // Custom Context Menu Logic
         function handleCalendarRightClick(e, dateStr) {
-            e.preventDefault(); // Prevent default browser menu
+            e.preventDefault(); 
             ctxSelectedDate = dateStr;
             const menu = document.getElementById('customContextMenu');
-            const displayDate = dateStr.split('-').reverse().join('-');
-            document.getElementById('ctxMenuDate').innerText = displayDate;
+            document.getElementById('ctxMenuDate').innerText = dateStr.split('-').reverse().join('-');
             
-            // Adjust position
             menu.style.display = 'block';
-            let x = e.pageX;
-            let y = e.pageY;
-            
-            // Prevent going off-screen
-            if (x + 200 > window.innerWidth) x = window.innerWidth - 200;
-            if (y + 100 > window.innerHeight) y = window.innerHeight - 100;
+            let x = e.pageX; let y = e.pageY;
+            if (x + 192 > window.innerWidth) x = window.innerWidth - 192;
+            if (y + 120 > window.innerHeight) y = window.innerHeight - 120;
             
             menu.style.left = x + 'px';
             menu.style.top = y + 'px';
@@ -526,41 +586,92 @@
             document.getElementById('customContextMenu').style.display = 'none';
         }
 
-        function openManualExamModalFromCtx() {
+        // Show details on left click
+        function showExamsForDay(dateStr) {
             closeContextMenu();
-            if(!ctxSelectedDate) return;
-            document.getElementById('manExamDate').value = ctxSelectedDate;
-            document.getElementById('manExamTime').value = '';
-            document.getElementById('manExamClasses').value = '';
-            document.getElementById('manExamSubject').value = '';
-            document.getElementById('manExamName').value = 'Examination';
+            ctxSelectedDate = dateStr;
+            let dayItems = scheduleCache.filter(s => s.date === dateStr);
+            document.getElementById('dayDetailsTitle').innerText = 'Items for ' + dateStr.split('-').reverse().join('-');
+            
+            let listContainer = document.getElementById('dayDetailsList');
+            if (dayItems.length === 0) {
+                listContainer.innerHTML = '<p class="text-xs text-slate-400 italic text-center py-6 font-bold">No events or exams scheduled.</p>';
+            } else {
+                let html = '';
+                dayItems.forEach(item => {
+                    let isExam = (!item.type || item.type === 'exam');
+                    let color = isExam ? 'teal' : 'amber';
+                    let icon = isExam ? 'fa-file-alt' : 'fa-calendar-check';
+                    let title = isExam ? (item.subject || 'N/A') + ' (' + (item.examName || '') + ')' : item.title;
+                    let desc = isExam ? 'Classes: ' + (item.classes || 'N/A') : (item.description || '');
+
+                    html += `
+                        <div class="bg-white border border-slate-200 rounded p-3 shadow-sm flex justify-between items-start hover:border-${color}-300 transition-colors">
+                            <div>
+                                <div class="text-[9px] md:text-[10px] font-bold text-${color}-600 uppercase mb-0.5"><i class="fas ${icon} mr-1"></i>${isExam ? 'Exam' : 'Event'} &bull; ${item.time || 'Time N/A'}</div>
+                                <div class="font-black text-slate-800 text-xs md:text-sm leading-tight">${title}</div>
+                                <div class="text-[10px] md:text-xs text-slate-600 mt-1">${desc}</div>
+                            </div>
+                            <div class="flex flex-col gap-1.5 ml-2 shrink-0">
+                                <button onclick="${isExam ? `openManualExamModal('${item.id}')` : `openManualEventModal('${item.id}')`}" class="text-indigo-500 hover:bg-indigo-50 px-2 py-1 rounded text-[10px] border border-indigo-100 shadow-sm"><i class="fas fa-edit"></i> Edit</button>
+                                <button onclick="deleteCalendarItem('${item.id}')" class="text-rose-500 hover:bg-rose-50 px-2 py-1 rounded text-[10px] border border-rose-100 shadow-sm"><i class="fas fa-trash"></i> Del</button>
+                            </div>
+                        </div>
+                    `;
+                });
+                listContainer.innerHTML = html;
+            }
+            document.getElementById('dayDetailsModal').classList.remove('hidden');
+        }
+
+        // Add/Edit Modals Logic
+        function openManualExamModal(id = null, dateStr = null) {
+            closeContextMenu();
+            document.getElementById('dayDetailsModal').classList.add('hidden');
+            
+            if (id) {
+                let item = scheduleCache.find(s => s.id === id);
+                document.getElementById('manExamId').value = item.id;
+                document.getElementById('manExamDate').value = item.date;
+                document.getElementById('manExamTime').value = item.time || '';
+                document.getElementById('manExamClasses').value = item.classes || '';
+                document.getElementById('manExamSubject').value = item.subject || '';
+                document.getElementById('manExamName').value = item.examName || '';
+            } else {
+                document.getElementById('manExamId').value = '';
+                document.getElementById('manExamDate').value = dateStr || '';
+                document.getElementById('manExamTime').value = '';
+                document.getElementById('manExamClasses').value = '';
+                document.getElementById('manExamSubject').value = '';
+                document.getElementById('manExamName').value = 'Examination';
+            }
             document.getElementById('manualExamModal').classList.remove('hidden');
         }
 
-        // Show details on left click
-        function showExamsForDay(dateStr) {
-            ctxSelectedDate = dateStr; // Store in case they want to add
-            let dayExams = scheduleCache.filter(s => s.date === dateStr);
-            let displayDate = dateStr.split('-').reverse().join('-');
+        function openManualEventModal(id = null, dateStr = null) {
+            closeContextMenu();
+            document.getElementById('dayDetailsModal').classList.add('hidden');
             
-            if (dayExams.length === 0) {
-                // If empty, just open the add modal directly
-                openManualExamModalFromCtx();
-                return;
+            if (id) {
+                let item = scheduleCache.find(s => s.id === id);
+                document.getElementById('manEventId').value = item.id;
+                document.getElementById('manEventDate').value = item.date;
+                document.getElementById('manEventTime').value = item.time || '';
+                document.getElementById('manEventTitle').value = item.title || '';
+                document.getElementById('manEventDesc').value = item.description || '';
+            } else {
+                document.getElementById('manEventId').value = '';
+                document.getElementById('manEventDate').value = dateStr || '';
+                document.getElementById('manEventTime').value = '';
+                document.getElementById('manEventTitle').value = '';
+                document.getElementById('manEventDesc').value = '';
             }
-
-            // Build a quick alert/modal showing the day's exams, with a button to add more.
-            // For simplicity, we reuse the printArea as a temporary view, or just use native alert for now.
-            // A better way: Inject a small detail pane below the calendar.
-            let msg = `Exams on ${displayDate}:\n\n`;
-            dayExams.forEach(e => msg += `- ${e.time} | ${e.classes} | ${e.subject} (${e.examName})\n`);
-            msg += `\nDo you want to add another exam to this date?`;
-            if (confirm(msg)) {
-                openManualExamModalFromCtx();
-            }
+            document.getElementById('manualEventModal').classList.remove('hidden');
         }
 
+        // Save Operations
         async function saveManualExam() {
+            const id = document.getElementById('manExamId').value;
             const d = document.getElementById('manExamDate').value;
             const t = document.getElementById('manExamTime').value.trim();
             const c = document.getElementById('manExamClasses').value.trim();
@@ -569,74 +680,107 @@
 
             if (!d || !t || !c || !s) return alert("Fill all required fields.");
 
-            const newExam = {
-                id: 'M' + Date.now(),
-                date: d, time: t, classes: c, subject: s, examName: n
-            };
-
-            scheduleCache.push(newExam);
+            if (id) {
+                let idx = scheduleCache.findIndex(x => x.id === id);
+                if(idx > -1) {
+                    scheduleCache[idx].date = d; scheduleCache[idx].time = t;
+                    scheduleCache[idx].classes = c; scheduleCache[idx].subject = s;
+                    scheduleCache[idx].examName = n;
+                }
+            } else {
+                scheduleCache.push({ id: 'M' + Date.now(), type: 'exam', date: d, time: t, classes: c, subject: s, examName: n });
+            }
             
-            const btn = document.querySelector('#manualExamModal button.bg-teal-600');
-            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+            await finalizeCalendarSave('manualExamModal');
+        }
 
+        async function saveManualEvent() {
+            const id = document.getElementById('manEventId').value;
+            const d = document.getElementById('manEventDate').value;
+            const t = document.getElementById('manEventTime').value.trim();
+            const title = document.getElementById('manEventTitle').value.trim();
+            const desc = document.getElementById('manEventDesc').value.trim();
+
+            if (!d || !title) return alert("Date and Title are required.");
+
+            if (id) {
+                let idx = scheduleCache.findIndex(x => x.id === id);
+                if(idx > -1) {
+                    scheduleCache[idx].date = d; scheduleCache[idx].time = t;
+                    scheduleCache[idx].title = title; scheduleCache[idx].description = desc;
+                }
+            } else {
+                scheduleCache.push({ id: 'E' + Date.now(), type: 'event', date: d, time: t, title: title, description: desc });
+            }
+            
+            await finalizeCalendarSave('manualEventModal');
+        }
+
+        async function deleteCalendarItem(id) {
+            if(!confirm("Delete this entry permanently?")) return;
+            scheduleCache = scheduleCache.filter(s => s.id !== id);
+            await finalizeCalendarSave('dayDetailsModal');
+        }
+
+        async function finalizeCalendarSave(modalToClose) {
             try {
                 await saveToDB('schedule', scheduleCache, 'schedule');
-                closeModal('manualExamModal');
-                renderVisualCalendar(); // Refresh calendar
+                if(modalToClose) closeModal(modalToClose);
+                renderVisualCalendar();
             } catch(e) {
                 alert("Failed to save. Network error.");
-            } finally {
-                btn.innerHTML = '<i class="fas fa-save mr-1"></i> Save to Schedule';
             }
         }
 
-        // Feature 3: Print Schedule (All / Class-Wise)
-        function printSchoolSchedule() {
-            if(scheduleCache.length === 0) return alert("No schedule data.");
-            let sorted = [...scheduleCache].sort((a,b) => new Date(a.date) - new Date(b.date) || a.time.localeCompare(b.time));
-            generateSchedulePrintHTML(sorted, "Full School Schedule");
+        // Print Calendar Feature
+        function openPrintCalendarModal() {
+            document.getElementById('printCalendarModal').classList.remove('hidden');
         }
 
-        function printClassSchedulePrompt() {
-            let cls = prompt("Enter Class Name to filter schedule (e.g., V-A, VI, X):");
-            if (!cls) return;
-            cls = cls.trim().toUpperCase();
-            
-            let filtered = scheduleCache.filter(s => {
-                let sClasses = s.classes.split(/[\s,;]+/).map(x => x.toUpperCase());
-                return sClasses.includes(cls) || sClasses.some(x => x.includes(cls));
+        function executeCalendarPrint() {
+            let filter = document.getElementById('calPrintFilter').value;
+            if(scheduleCache.length === 0) return alert("No data available.");
+
+            let dataToPrint = scheduleCache.filter(item => {
+                let isExam = (!item.type || item.type === 'exam');
+                if (filter === 'exams' && !isExam) return false;
+                if (filter === 'events' && isExam) return false;
+                return true;
             });
 
-            if (filtered.length === 0) return alert(`No exams found for class ${cls}.`);
-            
-            let sorted = filtered.sort((a,b) => new Date(a.date) - new Date(b.date) || a.time.localeCompare(b.time));
-            generateSchedulePrintHTML(sorted, `Exam Schedule - Class ${cls}`);
-        }
+            if (dataToPrint.length === 0) return alert('No data matches the selected filter.');
 
-        function generateSchedulePrintHTML(schedArray, titleText) {
-            let html = `<html><head><title>${titleText}</title><style>
+            dataToPrint.sort((a,b) => new Date(a.date) - new Date(b.date) || (a.time || '').localeCompare(b.time || ''));
+
+            let html = `<html><head><title>Academic Calendar Data</title><style>
                 body { font-family: 'Segoe UI', Arial, sans-serif; margin: 20px; color: #000; }
                 h1 { text-align: center; color: #1e3a8a; text-transform: uppercase; margin-bottom: 5px; }
                 h2 { text-align: center; font-size: 18px; text-decoration: underline; margin-top: 0; margin-bottom: 20px; }
                 table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-                th, td { border: 1px solid #333; padding: 10px; text-align: center; font-size: 14px; }
-                th { background-color: #f1f5f9; font-weight: bold; text-transform: uppercase; }
+                th, td { border: 1px solid #333; padding: 10px; text-align: left; font-size: 14px; }
+                th { background-color: #f1f5f9; font-weight: bold; text-transform: uppercase; text-align: center; }
+                .td-center { text-align: center; font-weight: bold;}
             </style></head><body>
                 <h1>${savedSchoolName}</h1>
-                <h2>${titleText}</h2>
+                <h2>Academic Master Schedule (${filter.toUpperCase()})</h2>
                 <table>
-                    <thead><tr><th>Date</th><th>Time</th><th>Exam Name</th><th>Classes</th><th>Subject</th></tr></thead>
+                    <thead><tr><th>Date</th><th>Time</th><th>Type</th><th>Details</th></tr></thead>
                     <tbody>
             `;
 
-            schedArray.forEach(s => {
+            dataToPrint.forEach(s => {
                 let displayDate = s.date.split('-').reverse().join('-');
+                let isExam = (!s.type || s.type === 'exam');
+                let typeStr = isExam ? 'EXAM' : 'EVENT';
+                let details = isExam 
+                    ? `<b>${s.classes || ''}</b> - ${s.subject || ''} <br><span style="font-size:11px; color:#555;">(${s.examName || ''})</span>` 
+                    : `<b>${s.title || ''}</b> <br><span style="font-size:11px; color:#555;">${s.description || ''}</span>`;
+
                 html += `<tr>
-                    <td style="font-weight:bold;">${displayDate}</td>
-                    <td>${s.time}</td>
-                    <td>${s.examName}</td>
-                    <td style="font-weight:bold; color:#d32f2f;">${s.classes}</td>
-                    <td style="font-weight:bold;">${s.subject}</td>
+                    <td class="td-center">${displayDate}</td>
+                    <td class="td-center">${s.time || '-'}</td>
+                    <td class="td-center" style="color:${isExam ? '#0f766e' : '#d97706'}">${typeStr}</td>
+                    <td>${details}</td>
                 </tr>`;
             });
 
@@ -644,6 +788,7 @@
             const w = window.open('', '_blank');
             w.document.write(html);
             w.document.close();
+            closeModal('printCalendarModal');
             setTimeout(() => { w.print(); }, 500);
         }
 
@@ -786,10 +931,9 @@
                             let rName = cols[0].trim().replace(/"/g, '');
                             let rGender = cols[1].trim().replace(/"/g, '');
                             let rCapStr = cols[2].trim().replace(/"/g, '');
-                            let rClass = cols[3].trim().replace(/"/g, ''); // Could be "V-A;V-B"
+                            let rClass = cols[3].trim().replace(/"/g, ''); 
                             let rCap = parseInt(rCapStr, 10);
 
-                            // We map by room name for initial import deduplication
                             let rId = 'R' + rName.replace(/\s+/g,'');
                             if(!roomsMap[rId]) roomsMap[rId] = { id: rId, name: rName, gender: rGender, classesList: [], classDetails: [], totalCapacity: 0 };
                             
@@ -815,13 +959,18 @@
                     for(let i=1; i<rows.length; i++) {
                         let cols = rows[i].split(delimiter);
                         if (cols.length >= 5 && cols[0].trim() !== '') {
-                            payload.push({ id: 'S'+Date.now()+i, date: cols[0].trim().replace(/"/g, ''), time: cols[1].trim().replace(/"/g, ''), classes: cols[2].trim().replace(/"/g, ''), subject: cols[3].trim().replace(/"/g, ''), examName: cols[4].trim().replace(/"/g, '').replace(/\r/g, '') });
+                            let sType = cols[5] ? cols[5].trim().replace(/"/g, '').toLowerCase() : 'exam';
+                            if (sType === 'event') {
+                                payload.push({ id: 'E'+Date.now()+i, type: 'event', date: cols[0].trim().replace(/"/g, ''), time: cols[1].trim().replace(/"/g, ''), title: cols[2].trim().replace(/"/g, ''), description: cols[3].trim().replace(/"/g, '') });
+                            } else {
+                                payload.push({ id: 'S'+Date.now()+i, type: 'exam', date: cols[0].trim().replace(/"/g, ''), time: cols[1].trim().replace(/"/g, ''), classes: cols[2].trim().replace(/"/g, ''), subject: cols[3].trim().replace(/"/g, ''), examName: cols[4].trim().replace(/"/g, '').replace(/\r/g, '') });
+                            }
                         }
                     }
                     if(payload.length > 0) {
                         scheduleCache = payload;
                         await saveToDB('schedule', scheduleCache, 'schedule');
-                        alert("Schedule imported successfully.");
+                        alert("Schedule & Events imported successfully.");
                         switchSetupTab('schedule');
                     }
                 }
@@ -839,7 +988,51 @@
         }
 
         /* =====================================================
-           ABSENTEE CHECKER VIEW (SUPPORTING GIRLS & BOYS)
+           ROOM STICKERS VIEW (A4 LANDSCAPE SUPPORT)
+        ==================================================== */
+        function renderRoomStickers(workspace) {
+            if (!roomConfigsCache || roomConfigsCache.length === 0) {
+                workspace.innerHTML = '<p class="text-slate-500 italic text-center py-10 font-bold">No rooms synchronized yet. Please setup rooms via CSV first.</p>';
+                return;
+            }
+
+            let roomCheckboxes = roomConfigsCache.map((r, idx) => `
+                <label class="flex items-center gap-3 p-3 bg-white border border-slate-200 rounded-lg shadow-sm cursor-pointer hover:bg-pink-50 hover:border-pink-300 transition-colors">
+                    <input type="checkbox" value="${r.id}" class="sticker-room-chk w-5 h-5 text-pink-600 rounded focus:ring-pink-500" checked>
+                    <div>
+                        <div class="font-black text-slate-800 text-base leading-tight">${r.name}</div>
+                        <div class="text-xs text-slate-500 font-bold mt-0.5">Classes: ${r.classesList ? r.classesList.join(', ') : 'None'}</div>
+                    </div>
+                </label>
+            `).join('');
+
+            workspace.innerHTML = `
+                <div class="max-w-5xl mx-auto bg-white rounded-xl shadow-sm border border-slate-200 p-4 md:p-6">
+                    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 border-b pb-4 gap-4">
+                        <div>
+                            <h2 class="font-black text-slate-800 text-lg md:text-xl flex items-center"><i class="fas fa-tags mr-2 text-pink-500"></i> Room Door Stickers</h2>
+                            <p class="text-[10px] md:text-xs text-slate-500 font-bold mt-1">Select rooms to generate professional A4 landscape door signs.</p>
+                        </div>
+                        <button onclick="printRoomStickers()" class="w-full sm:w-auto bg-pink-600 hover:bg-pink-700 text-white font-black px-6 py-2.5 rounded shadow-md transition-colors flex items-center justify-center">
+                            <i class="fas fa-print mr-2"></i> Print Selected
+                        </button>
+                    </div>
+                    
+                    <div class="mb-4 flex gap-4 bg-slate-50 p-2 rounded border border-slate-200 w-max">
+                        <button onclick="document.querySelectorAll('.sticker-room-chk').forEach(cb => cb.checked = true)" class="text-[10px] md:text-xs font-bold text-indigo-600 hover:underline"><i class="fas fa-check-square mr-1"></i> Select All</button>
+                        <span class="text-slate-300">|</span>
+                        <button onclick="document.querySelectorAll('.sticker-room-chk').forEach(cb => cb.checked = false)" class="text-[10px] md:text-xs font-bold text-slate-500 hover:underline"><i class="far fa-square mr-1"></i> Deselect All</button>
+                    </div>
+                    
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 md:gap-4">
+                        ${roomCheckboxes}
+                    </div>
+                </div>
+            `;
+        }
+
+        /* =====================================================
+           ABSENTEE CHECKER VIEW 
         ==================================================== */
         function renderChecker(workspace) {
             let uniqueDates = [...new Set(scheduleCache.map(s => s.date))].sort((a,b) => new Date(a) - new Date(b));
@@ -893,7 +1086,6 @@
             }
 
             let matchingRooms = [];
-
             for (let room of roomConfigsCache) {
                 let roomGender = String(room.gender || '').trim().toUpperCase();
                 if (g && roomGender && roomGender !== g && roomGender !== 'MIXED') continue;
@@ -924,11 +1116,9 @@
             }
 
             let resultHTML = '';
-            
             matchingRooms.forEach(foundRoom => {
                 let safeAbsData = absenteesCache[d] || {};
                 if (Array.isArray(safeAbsData)) safeAbsData = safeAbsData[0] || {};
-                
                 const isAbsent = safeAbsData[foundRoom.id] && safeAbsData[foundRoom.id].includes(`${c}_${r}`);
                 
                 let safeDutyData = dutyRecordsCache[d] || {};
@@ -1445,6 +1635,7 @@
                 let roomClassNames = roomClassesToPrint.map(c => c.className);
 
                 let relevantSchedules = scheduleCache.filter(s => {
+                    if(s.type === 'event') return false; // Ignore events for printing
                     let sClasses = s.classes.split(/[\s,;]+/).filter(Boolean);
                     return sClasses.some(sc => roomClassNames.includes(sc));
                 });
@@ -1538,7 +1729,7 @@
         /* =====================================================
            FEATURE 4: PROFESSIONAL A4 LANDSCAPE ROOM STICKERS
         ==================================================== */
-        function Stickers() {
+        function printRoomStickers() {
             const checkedIds = Array.from(document.querySelectorAll('.sticker-room-chk:checked')).map(cb => cb.value);
             if (checkedIds.length === 0) return alert("Select at least one room to print.");
 
