@@ -1538,7 +1538,7 @@
         /* =====================================================
            FEATURE 4: PROFESSIONAL A4 LANDSCAPE ROOM STICKERS
         ==================================================== */
-        function printRoomStickers() {
+        function Stickers() {
             const checkedIds = Array.from(document.querySelectorAll('.sticker-room-chk:checked')).map(cb => cb.value);
             if (checkedIds.length === 0) return alert("Select at least one room to print.");
 
