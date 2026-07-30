@@ -916,7 +916,8 @@
 
         /* =====================================================
            CSV PARSER LOGIC
-        ==================================================== */
+
+        ===================================== */
         async function processCSV(type) {
             let fileId = type === 'rooms' ? 'csvRooms' : (type === 'schedule' ? 'csvSchedule' : 'csvStaff');
             const file = document.getElementById(fileId).files[0];
@@ -1607,144 +1608,157 @@
             container.innerHTML = html;
         }
 
-         function executeRoomPrint() {
-            const roomId = document.getElementById('printRoomSelect').value;
-            if(!roomId) return alert("Select a room.");
+        function executeRoomPrint() {
+    const roomId = document.getElementById('printRoomSelect').value;
+    if (!roomId) return alert("Select a room.");
+    
+    const checkedClasses = Array.from(document.querySelectorAll('.print-class-chk:checked')).map(cb => cb.value);
+    if (checkedClasses.length === 0) return alert("Select at least one class.");
+
+    let roomsToPrint = roomId === 'ALL' ? roomConfigsCache : [roomConfigsCache.find(r => r.id === roomId)];
+
+    let fullHtml = `<html><head><title>Room Attendance Sheets</title><style>
+        @page { size: A4 portrait; margin: 15mm; }
+        body { font-family: 'Segoe UI', 'Helvetica Neue', sans-serif; margin:0; padding:0; color: #000; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+        .page-break { page-break-after: always; padding-bottom: 20px; }
+        .page-break:last-child { page-break-after: auto; }
+        .header-container { display: flex; align-items: center; justify-content: space-between; border-bottom: 3px solid #3f51b5; padding-bottom: 10px; margin-bottom: 15px; }
+        .header-text { text-align: center; flex-grow: 1; }
+        .header-text h2 { margin: 0; font-size: 26px; text-transform: uppercase; font-weight: 900; letter-spacing: 1px; color: #3f51b5; }
+        .header-text h3 { margin: 5px 0 0 0; font-size: 16px; font-weight: bold; text-decoration: underline; color: #333; }
+        .meta { display: flex; justify-content: space-between; font-weight: bold; margin-bottom: 15px; font-size: 15px; background: #f8f9fa; padding: 12px 15px; border: 1px solid #e0e0e0; border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);}
+        table { width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        th, td { border: 1px solid #333; padding: 10px 6px; text-align: center; vertical-align: middle; }
+        th { background: #e0e0e0 !important; font-weight: 900; text-transform: uppercase; font-size: 13px; letter-spacing: 0.5px; }
+        .allotment { text-align: left; font-size: 12px; line-height: 1.5; }
+        .subject-cell { text-align: left; font-weight: bold; font-size: 13px; line-height: 1.4; color: #d32f2f; }
+        .signatures { margin-top: 50px; display: flex; justify-content: space-between; font-weight: bold; padding: 0 30px; font-size: 15px; }
+        .signatures div { border-top: 1px dashed #000; padding-top: 8px; width: 220px; text-align: center; color: #333; }
+        @media print { .no-print { display: none !important; } }
+    </style></head><body>
+    <button class="no-print" onclick="window.print()" style="position:fixed; bottom:20px; right:20px; padding:15px 25px; background:#3f51b5; color:white; font-size:16px; font-weight:bold; border:none; border-radius:5px; cursor:pointer; box-shadow:0 4px 6px rgba(0,0,0,0.3); z-index: 1000;">🖨️ Print Sheets</button>
+    `;
+
+    let pagesAdded = 0;
+
+    roomsToPrint.forEach(room => {
+        let roomClassesToPrint = room.classDetails.filter(c => checkedClasses.includes(c.className));
+        if(roomClassesToPrint.length === 0) return; 
+
+        let roomClassNames = roomClassesToPrint.map(c => c.className);
+
+        let relevantSchedules = scheduleCache.filter(s => {
+            // FIX 1: Ignore non-exam events to prevent crashes
+            if (s.type === 'event') return false; 
+            let sClasses = (s.classes || '').split(/[\s,;]+/).filter(Boolean);
+            return sClasses.some(sc => roomClassNames.includes(sc));
+        });
+
+        if(relevantSchedules.length === 0) return;
+
+        let groupedSched = {};
+        relevantSchedules.forEach(s => {
+            let key = s.date + '|' + s.time;
+            if(!groupedSched[key]) {
+                groupedSched[key] = { date: s.date, time: s.time, exams: [] };
+            }
             
-            const checkedClasses = Array.from(document.querySelectorAll('.print-class-chk:checked')).map(cb => cb.value);
-            if(checkedClasses.length === 0) return alert("Select at least one class.");
+            let sClasses = (s.classes || '').split(/[\s,;]+/).filter(Boolean);
+            let overlapping = sClasses.filter(sc => roomClassNames.includes(sc));
+            if(overlapping.length > 0) {
+                groupedSched[key].exams.push(`<b style="color:#000;">${overlapping.join(', ')}</b> - ${s.subject}`);
+            }
+        });
 
-            let roomsToPrint = roomId === 'ALL' ? roomConfigsCache : [roomConfigsCache.find(r => r.id === roomId)];
+        // FIX 2: Correct Time Sorting Logic
+        let sortedGroups = Object.values(groupedSched).sort((a,b) => {
+            let dateA = new Date(a.date);
+            let dateB = new Date(b.date);
+            if (dateA.getTime() !== dateB.getTime()) {
+                return dateA - dateB; 
+            }
+            
+            // Convert "9:00 AM" or "01:30 PM" to minutes for flawless sorting
+            const parseTime = (timeStr) => {
+                const match = String(timeStr).match(/(\d+):(\d+)\s*(AM|PM)/i);
+                if (!match) return 0;
+                let hrs = parseInt(match[1], 10);
+                if (match[3].toUpperCase() === 'PM' && hrs !== 12) hrs += 12;
+                if (match[3].toUpperCase() === 'AM' && hrs === 12) hrs = 0;
+                return hrs * 60 + parseInt(match[2], 10);
+            };
+            
+            return parseTime(a.time) - parseTime(b.time); 
+        });
 
-            let fullHtml = `<html><head><title>Room Attendance Sheets</title><style>
-                @page { size: A4 portrait; margin: 15mm; }
-                body { font-family: 'Segoe UI', 'Helvetica Neue', sans-serif; margin:0; padding:0; color: #000; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-                .page-break { page-break-after: always; padding-bottom: 20px; }
-                .page-break:last-child { page-break-after: auto; }
-                .header-container { display: flex; align-items: center; justify-content: space-between; border-bottom: 3px solid #3f51b5; padding-bottom: 10px; margin-bottom: 15px; }
-                .header-text { text-align: center; flex-grow: 1; }
-                .header-text h2 { margin: 0; font-size: 26px; text-transform: uppercase; font-weight: 900; letter-spacing: 1px; color: #3f51b5; }
-                .header-text h3 { margin: 5px 0 0 0; font-size: 16px; font-weight: bold; text-decoration: underline; color: #333; }
-                .meta { display: flex; justify-content: space-between; font-weight: bold; margin-bottom: 15px; font-size: 15px; background: #f8f9fa; padding: 12px 15px; border: 1px solid #e0e0e0; border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);}
-                table { width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-                th, td { border: 1px solid #333; padding: 10px 6px; text-align: center; vertical-align: middle; }
-                th { background: #e0e0e0 !important; font-weight: 900; text-transform: uppercase; font-size: 13px; letter-spacing: 0.5px; }
-                .allotment { text-align: left; font-size: 12px; line-height: 1.5; }
-                .subject-cell { text-align: left; font-weight: bold; font-size: 13px; line-height: 1.4; color: #d32f2f; }
-                .signatures { margin-top: 50px; display: flex; justify-content: space-between; font-weight: bold; padding: 0 30px; font-size: 15px; }
-                .signatures div { border-top: 1px dashed #000; padding-top: 8px; width: 220px; text-align: center; color: #333; }
-                @media print { .no-print { display: none !important; } }
-            </style></head><body>
-            <button class="no-print" onclick="window.print()" style="position:fixed; bottom:20px; right:20px; padding:15px 25px; background:#3f51b5; color:white; font-size:16px; font-weight:bold; border:none; border-radius:5px; cursor:pointer; box-shadow:0 4px 6px rgba(0,0,0,0.3); z-index: 1000;">🖨️ Print Sheets</button>
-            `;
+        let allotmentStr = roomClassesToPrint.map(c => `<span style="color:#555;"><b>${c.className}:</b></span> ${c.rolls}`).join('<br>');
 
-            let pagesAdded = 0;
-
-            roomsToPrint.forEach(room => {
-                let roomClassesToPrint = room.classDetails.filter(c => checkedClasses.includes(c.className));
-                if(roomClassesToPrint.length === 0) return; 
-
-                let roomClassNames = roomClassesToPrint.map(c => c.className);
-
-                let relevantSchedules = scheduleCache.filter(s => {
-                    let sClasses = s.classes.split(/[\s,;]+/).filter(Boolean);
-                    return sClasses.some(sc => roomClassNames.includes(sc));
-                });
-
-                if(relevantSchedules.length === 0) return;
-
-                let groupedSched = {};
-                relevantSchedules.forEach(s => {
-                    let key = s.date + '|' + s.time;
-                    if(!groupedSched[key]) {
-                        groupedSched[key] = { date: s.date, time: s.time, exams: [] };
-                    }
-                    
-                    let sClasses = s.classes.split(/[\s,;]+/).filter(Boolean);
-                    let overlapping = sClasses.filter(sc => roomClassNames.includes(sc));
-                    if(overlapping.length > 0) {
-                        groupedSched[key].exams.push(`<b style="color:#000;">${overlapping.join(', ')}</b> - ${s.subject}`);
-                    }
-                });
-
-                // PROPER ASCENDING DATE SORTING (using real Date math)
-                let sortedGroups = Object.values(groupedSched).sort((a,b) => {
-                    let dateA = new Date(a.date);
-                    let dateB = new Date(b.date);
-                    if (dateA.getTime() !== dateB.getTime()) {
-                        return dateA - dateB; // Ascending chronologically
-                    }
-                    return a.time.localeCompare(b.time); // Ascending time on same day
-                });
-
-                let allotmentStr = roomClassesToPrint.map(c => `<span style="color:#555;"><b>${c.className}:</b></span> ${c.rolls}`).join('<br>');
-
-                fullHtml += `
-                    <div class="page-break">
-                        <div class="header-container">
-                            <img src="https://raw.githubusercontent.com/mrinmoyedebnath-sys/mylogo/main/STH.png" crossorigin="anonymous" style="width:75px; height:75px; object-fit:contain;">
-                            <div class="header-text">
-                                <h2>${savedSchoolName}</h2>
-                                <h3>EXAM ATTENDANCE & ROOM SHEET</h3>
-                            </div>
-                            <img src="https://raw.githubusercontent.com/mrinmoyedebnath-sys/mylogo/main/STH.png" crossorigin="anonymous" style="width:75px; height:75px; object-fit:contain;">
-                        </div>
-                        <div class="meta">
-                            <div><span style="color:#777; font-weight:normal;">Room:</span> <span style="font-size:20px; color:#d32f2f;">${room.name}</span> <span style="font-size:12px; font-weight:normal; color:#555;">(${room.gender})</span></div>
-                            <div style="text-align:right;"><span style="color:#777; font-weight:normal;">Classes Allotted:</span><br><span style="font-size:16px;">${roomClassNames.join(', ')}</span></div>
-                        </div>
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th style="width:5%">Sl</th>
-                                    <th style="width:13%">Date</th>
-                                    <th style="width:10%">Time</th>
-                                    <th style="width:28%">Class & Subject</th>
-                                    <th style="width:15%">Allotment</th>
-                                    <th style="width:17%">Absentee Roll Nos.<br><span style="font-size:9px; font-weight:normal;">(Write Below)</span></th>
-                                    <th style="width:12%">Invigilator<br>Signature</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                `;
-
-                sortedGroups.forEach((g, idx) => {
-                    let displayDate = g.date.split('-').reverse().join('-');
-                    let uniqueExams = [...new Set(g.exams)].join('<div style="border-top:1px dashed #ccc; margin:4px 0;"></div>');
-                    
-                    fullHtml += `
-                        <tr>
-                            <td style="font-weight:900; font-size:15px; background:#f8f9fa;">${idx + 1}</td>
-                            <td style="font-weight:bold; font-size:14px;">${displayDate}</td>
-                            <td style="font-weight:bold; font-size:13px;">${g.time}</td>
-                            <td class="subject-cell">${uniqueExams}</td>
-                            <td class="allotment">${allotmentStr}</td>
-                            <td style="height: 55px;"></td>
-                            <td></td>
-                        </tr>
-                    `;
-                });
-
-                fullHtml += `</tbody></table>
-                    <div class="signatures">
-                        <div>Signature of Exam In-Charge</div>
-                        <div>Signature of Center Supt.</div>
+        fullHtml += `
+            <div class="page-break">
+                <div class="header-container">
+                    <img src="https://raw.githubusercontent.com/mrinmoyedebnath-sys/mylogo/main/STH.png" crossorigin="anonymous" style="width:75px; height:75px; object-fit:contain;">
+                    <div class="header-text">
+                        <h2>${savedSchoolName}</h2>
+                        <h3>EXAM ATTENDANCE & ROOM SHEET</h3>
                     </div>
-                </div>`;
-                
-                pagesAdded++;
-            });
+                    <img src="https://raw.githubusercontent.com/mrinmoyedebnath-sys/mylogo/main/STH.png" crossorigin="anonymous" style="width:75px; height:75px; object-fit:contain;">
+                </div>
+                <div class="meta">
+                    <div><span style="color:#777; font-weight:normal;">Room:</span> <span style="font-size:20px; color:#d32f2f;">${room.name}</span> <span style="font-size:12px; font-weight:normal; color:#555;">(${room.gender})</span></div>
+                    <div style="text-align:right;"><span style="color:#777; font-weight:normal;">Classes Allotted:</span><br><span style="font-size:16px;">${roomClassNames.join(', ')}</span></div>
+                </div>
+                <table>
+                    <thead>
+                        <tr>
+                            <th style="width:5%">Sl</th>
+                            <th style="width:13%">Date</th>
+                            <th style="width:10%">Time</th>
+                            <th style="width:28%">Class & Subject</th>
+                            <th style="width:15%">Allotment</th>
+                            <th style="width:17%">Absentee Roll Nos.<br><span style="font-size:9px; font-weight:normal;">(Write Below)</span></th>
+                            <th style="width:12%">Invigilator<br>Signature</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+        `;
 
-            fullHtml += `</body></html>`;
+        sortedGroups.forEach((g, idx) => {
+            let displayDate = g.date.split('-').reverse().join('-');
+            let uniqueExams = [...new Set(g.exams)].join('<div style="border-top:1px dashed #ccc; margin:4px 0;"></div>');
+            
+            fullHtml += `
+                <tr>
+                    <td style="font-weight:900; font-size:15px; background:#f8f9fa;">${idx + 1}</td>
+                    <td style="font-weight:bold; font-size:14px;">${displayDate}</td>
+                    <td style="font-weight:bold; font-size:13px;">${g.time}</td>
+                    <td class="subject-cell">${uniqueExams}</td>
+                    <td class="allotment">${allotmentStr}</td>
+                    <td style="height: 55px;"></td>
+                    <td></td>
+                </tr>
+            `;
+        });
 
-            if(pagesAdded === 0) return alert("No schedule data found for the selected criteria.");
+        fullHtml += `</tbody></table>
+            <div class="signatures">
+                <div>Signature of Exam In-Charge</div>
+                <div>Signature of Center Supt.</div>
+            </div>
+        </div>`;
+        
+        pagesAdded++;
+    });
 
-            const w = window.open('', '_blank');
-            w.document.write(fullHtml);
-            w.document.close();
-            closeModal('roomPrintModal');
-            setTimeout(() => { w.print(); }, 800);
-        }
+    fullHtml += `</body></html>`;
+
+    if (pagesAdded === 0) return alert("No schedule data found for the selected criteria.");
+
+    const w = window.open('', '_blank');
+    w.document.write(fullHtml);
+    w.document.close();
+    closeModal('roomPrintModal');
+    setTimeout(() => { w.print(); }, 800);
+}
        /* =====================================================
            FEATURE 4: PROFESSIONAL MINIMALIST ROOM STICKERS
         ==================================================== */
