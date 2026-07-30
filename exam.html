@@ -285,23 +285,26 @@
         // INITIALIZATION
 
         // INITIALIZATION
-        window.addEventListener('DOMContentLoaded', async () => {
-            // STRICT SECURITY: Fetch credentials properly without falling back to '1'
-            let role = sessionStorage.getItem('userRole') || localStorage.getItem('userRole'); 
-            globalSchoolId = sessionStorage.getItem('schoolId') || localStorage.getItem('schoolId');
-            savedSchoolName = sessionStorage.getItem('schoolName') || localStorage.getItem('schoolName') || "Exam Center";
+       window.addEventListener('DOMContentLoaded', async () => {
+            // Force Admin role and School ID 1 if they are missing (Bypass Login)
+            let role = sessionStorage.getItem('userRole') || localStorage.getItem('userRole') || 'admin'; 
+            globalSchoolId = sessionStorage.getItem('schoolId') || localStorage.getItem('schoolId') || '1';
+            savedSchoolName = sessionStorage.getItem('schoolName') || localStorage.getItem('schoolName') || "Patkabari High School";
 
-            // Enforce strict security to prevent fetching the wrong school's data
-            if (!globalSchoolId || globalSchoolId === 'undefined' || globalSchoolId === 'null') {
-                alert("Unauthorized Access or Session Expired. Redirecting to login...");
+            /* Security check commented out for direct GitHub access
+            if (role !== 'admin' || !globalSchoolId || isNaN(parseInt(globalSchoolId, 10))) {
+                alert("Unauthorized Access. Redirecting to login.");
                 window.location.href = 'index.html'; 
                 return;
             }
-
+            */
+            
             document.getElementById('examSchoolNameDisplay').textContent = savedSchoolName;
+
             await fetchExamData();
-            renderView('setup'); 
+            renderView('duty'); 
         });
+
 
         /* =====================================================
            DATABASE FETCHING (FETCH ALL EXAM_DB DATA)
