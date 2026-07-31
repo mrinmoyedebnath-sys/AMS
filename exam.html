@@ -1610,15 +1610,22 @@
 /* =====================================================
            PRINT: DYNAMIC ROOM SHEETS (PROFESSIONAL & DATE SORTED)
         ==================================================== */
+        /* =====================================================
+           PRINT: DYNAMIC ROOM SHEETS (WITH QR CODE)
+        ==================================================== */
         function executeRoomPrint() {
             const roomId = document.getElementById('printRoomSelect').value;
-            if(!roomId) return alert("Select a room.");
+            if (!roomId) return alert("Select a room.");
             
-            // Normalize selected classes to uppercase for perfect matching
             const checkedClasses = Array.from(document.querySelectorAll('.print-class-chk:checked')).map(cb => String(cb.value).toUpperCase().trim());
-            if(checkedClasses.length === 0) return alert("Select at least one class.");
+            if (checkedClasses.length === 0) return alert("Select at least one class.");
 
             let roomsToPrint = roomId === 'ALL' ? roomConfigsCache : [roomConfigsCache.find(r => r.id === roomId)];
+
+            // 👉 CHANGE THIS URL TO YOUR ACTUAL STAFF PORTAL URL! 
+            const staffPortalUrl = "https://mrinmoyedebnath-sys.github.io/AMS/index.html";
+            // This API automatically turns your URL into a printable QR Code image
+            const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(staffPortalUrl)}`;
 
             let fullHtml = `<html><head><title>Room Attendance Sheets</title><style>
                 @page { size: A4 portrait; margin: 15mm; }
@@ -1637,6 +1644,12 @@
                 .subject-cell { text-align: left; font-weight: bold; font-size: 13px; line-height: 1.4; color: #d32f2f; }
                 .signatures { margin-top: 50px; display: flex; justify-content: space-between; font-weight: bold; padding: 0 30px; font-size: 15px; }
                 .signatures div { border-top: 1px dashed #000; padding-top: 8px; width: 220px; text-align: center; color: #333; }
+                
+                /* QR CODE STYLES */
+                .qr-header { display: flex; justify-content: flex-end; align-items: center; margin-bottom: 5px; }
+                .qr-text { font-size: 10px; color: #444; margin-right: 10px; text-align: right; line-height: 1.3; font-weight: bold; }
+                .qr-img { width: 50px; height: 50px; border: 1px solid #ccc; padding: 2px; border-radius: 4px; }
+                
                 @media print { .no-print { display: none !important; } }
             </style></head><body>
             <button class="no-print" onclick="window.print()" style="position:fixed; bottom:20px; right:20px; padding:15px 25px; background:#3f51b5; color:white; font-size:16px; font-weight:bold; border:none; border-radius:5px; cursor:pointer; box-shadow:0 4px 6px rgba(0,0,0,0.3); z-index: 1000;">🖨️ Print Sheets</button>
@@ -1679,7 +1692,7 @@
                     }
                 });
 
-                // FIX 2: Correct Time Sorting Logic (handles blank times and AM/PM format safely)
+                // FIX 2: Correct Time Sorting Logic
                 let sortedGroups = Object.values(groupedSched).sort((a,b) => {
                     let dateA = new Date(a.date);
                     let dateB = new Date(b.date);
@@ -1703,6 +1716,13 @@
 
                 fullHtml += `
                     <div class="page-break">
+                        
+                        <!-- NEW QR CODE SECTION -->
+                        <div class="qr-header">
+                            <div class="qr-text">Scan this QR code for updating absentee,<br>at the end part of window - "My Exam Duties"</div>
+                            <img src="${qrCodeUrl}" class="qr-img" alt="QR Code">
+                        </div>
+                        
                         <div class="header-container">
                             <img src="https://raw.githubusercontent.com/mrinmoyedebnath-sys/mylogo/main/STH.png" crossorigin="anonymous" style="width:75px; height:75px; object-fit:contain;">
                             <div class="header-text">
@@ -1772,7 +1792,6 @@
             closeModal('roomPrintModal');
             setTimeout(() => { w.print(); }, 800);
         }
- 
        /* =====================================================
            FEATURE 4: PROFESSIONAL MINIMALIST ROOM STICKERS
         ==================================================== */
