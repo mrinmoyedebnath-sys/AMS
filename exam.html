@@ -1613,6 +1613,9 @@
         /* =====================================================
            PRINT: DYNAMIC ROOM SHEETS (WITH QR CODE)
         ==================================================== */
+        /* =====================================================
+           PRINT: DYNAMIC ROOM SHEETS (WITH HEADER QR CODE)
+        ==================================================== */
         function executeRoomPrint() {
             const roomId = document.getElementById('printRoomSelect').value;
             if (!roomId) return alert("Select a room.");
@@ -1624,7 +1627,6 @@
 
             // 👉 CHANGE THIS URL TO YOUR ACTUAL STAFF PORTAL URL! 
             const staffPortalUrl = "https://mrinmoyedebnath-sys.github.io/AMS/index.html";
-            // This API automatically turns your URL into a printable QR Code image
             const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(staffPortalUrl)}`;
 
             let fullHtml = `<html><head><title>Room Attendance Sheets</title><style>
@@ -1632,10 +1634,19 @@
                 body { font-family: 'Segoe UI', 'Helvetica Neue', sans-serif; margin:0; padding:0; color: #000; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
                 .page-break { page-break-after: always; padding-bottom: 20px; }
                 .page-break:last-child { page-break-after: auto; }
+                
+                /* HEADER LAYOUT: 3-column flexbox to keep title perfectly centered */
                 .header-container { display: flex; align-items: center; justify-content: space-between; border-bottom: 3px solid #3f51b5; padding-bottom: 10px; margin-bottom: 15px; }
-                .header-text { text-align: center; flex-grow: 1; }
+                .header-left { width: 180px; display: flex; justify-content: flex-start; }
+                .header-text { text-align: center; flex: 1; }
                 .header-text h2 { margin: 0; font-size: 26px; text-transform: uppercase; font-weight: 900; letter-spacing: 1px; color: #3f51b5; }
                 .header-text h3 { margin: 5px 0 0 0; font-size: 16px; font-weight: bold; text-decoration: underline; color: #333; }
+                
+                /* QR CODE (RIGHT SIDE) */
+                .header-right { width: 180px; display: flex; justify-content: flex-end; align-items: center; gap: 8px; text-align: right; }
+                .qr-text { font-size: 9px; color: #444; font-weight: bold; line-height: 1.3; }
+                .qr-img { width: 60px; height: 60px; border: 1px solid #ccc; padding: 2px; border-radius: 4px; }
+
                 .meta { display: flex; justify-content: space-between; font-weight: bold; margin-bottom: 15px; font-size: 15px; background: #f8f9fa; padding: 12px 15px; border: 1px solid #e0e0e0; border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);}
                 table { width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
                 th, td { border: 1px solid #333; padding: 10px 6px; text-align: center; vertical-align: middle; }
@@ -1644,12 +1655,6 @@
                 .subject-cell { text-align: left; font-weight: bold; font-size: 13px; line-height: 1.4; color: #d32f2f; }
                 .signatures { margin-top: 50px; display: flex; justify-content: space-between; font-weight: bold; padding: 0 30px; font-size: 15px; }
                 .signatures div { border-top: 1px dashed #000; padding-top: 8px; width: 220px; text-align: center; color: #333; }
-                
-                /* QR CODE STYLES */
-                .qr-header { display: flex; justify-content: flex-end; align-items: center; margin-bottom: 5px; }
-                .qr-text { font-size: 10px; color: #444; margin-right: 10px; text-align: right; line-height: 1.3; font-weight: bold; }
-                .qr-img { width: 50px; height: 50px; border: 1px solid #ccc; padding: 2px; border-radius: 4px; }
-                
                 @media print { .no-print { display: none !important; } }
             </style></head><body>
             <button class="no-print" onclick="window.print()" style="position:fixed; bottom:20px; right:20px; padding:15px 25px; background:#3f51b5; color:white; font-size:16px; font-weight:bold; border:none; border-radius:5px; cursor:pointer; box-shadow:0 4px 6px rgba(0,0,0,0.3); z-index: 1000;">🖨️ Print Sheets</button>
@@ -1658,20 +1663,18 @@
             let pagesAdded = 0;
 
             roomsToPrint.forEach(room => {
-                // FIX 1: Add the safety fallback for older databases missing classDetails
                 let details = room.classDetails || [];
                 if (details.length === 0 && room.classesList) {
                      details = room.classesList.map(c => ({ className: c, rolls: "1-40", capacity: room.totalCapacity || 40 }));
                 }
 
-                // Filter using uppercase for safety
                 let roomClassesToPrint = details.filter(c => checkedClasses.includes(String(c.className).toUpperCase().trim()));
                 if(roomClassesToPrint.length === 0) return; 
 
                 let roomClassNames = roomClassesToPrint.map(c => String(c.className).toUpperCase().trim());
 
                 let relevantSchedules = scheduleCache.filter(s => {
-                    if (s.type === 'event') return false; // Ignore non-exam events
+                    if (s.type === 'event') return false; 
                     let sClasses = String(s.classes || '').split(/[\s,;]+/).map(x => x.toUpperCase().trim()).filter(Boolean);
                     return sClasses.some(sc => roomClassNames.includes(sc));
                 });
@@ -1692,7 +1695,6 @@
                     }
                 });
 
-                // FIX 2: Correct Time Sorting Logic
                 let sortedGroups = Object.values(groupedSched).sort((a,b) => {
                     let dateA = new Date(a.date);
                     let dateB = new Date(b.date);
@@ -1716,21 +1718,23 @@
 
                 fullHtml += `
                     <div class="page-break">
-                        
-                        <!-- NEW QR CODE SECTION -->
-                        <div class="qr-header">
-                            <div class="qr-text">Scan this QR code for updating absentee,<br>at the end part of window - "My Exam Duties"</div>
-                            <img src="${qrCodeUrl}" class="qr-img" alt="QR Code">
-                        </div>
-                        
                         <div class="header-container">
-                            <img src="https://raw.githubusercontent.com/mrinmoyedebnath-sys/mylogo/main/STH.png" crossorigin="anonymous" style="width:75px; height:75px; object-fit:contain;">
+                            <div class="header-left">
+                                <img src="https://raw.githubusercontent.com/mrinmoyedebnath-sys/mylogo/main/STH.png" crossorigin="anonymous" style="width:75px; height:75px; object-fit:contain;">
+                            </div>
+                            
                             <div class="header-text">
                                 <h2>${savedSchoolName}</h2>
                                 <h3>EXAM ATTENDANCE & ROOM SHEET</h3>
                             </div>
-                            <img src="https://raw.githubusercontent.com/mrinmoyedebnath-sys/mylogo/main/STH.png" crossorigin="anonymous" style="width:75px; height:75px; object-fit:contain;">
+                            
+                            <!-- QR CODE TOP RIGHT -->
+                            <div class="header-right">
+                                <div class="qr-text">Scan to update absentee<br>in "My Exam Duties"</div>
+                                <img src="${qrCodeUrl}" class="qr-img" alt="QR Code">
+                            </div>
                         </div>
+                        
                         <div class="meta">
                             <div><span style="color:#777; font-weight:normal;">Room:</span> <span style="font-size:20px; color:#d32f2f;">${room.name}</span> <span style="font-size:12px; font-weight:normal; color:#555;">(${room.gender})</span></div>
                             <div style="text-align:right;"><span style="color:#777; font-weight:normal;">Classes Allotted:</span><br><span style="font-size:16px;">${roomClassNames.join(', ')}</span></div>
@@ -1781,7 +1785,6 @@
 
             if (pagesAdded === 0) return alert("No schedule data found for the selected criteria.");
 
-            // FIX 3: Detect if the browser blocked the popup
             const w = window.open('', '_blank');
             if (!w) {
                 return alert("Popup Blocked! Please allow popups in your browser settings to print the sheets.");
