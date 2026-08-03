@@ -1516,8 +1516,10 @@
         /* =====================================================
            FEATURE 5: SMART ABSENTEE REPORT & PIE DASHBOARD
         ==================================================== */
+      /* =====================================================
+           FEATURE 5: SMART ABSENTEE REPORT & CLASS-WISE PIE CHARTS
+        ==================================================== */
         function printAbsenteeReport() {
-            // Dynamically create the settings modal so you don't have to change your HTML
             let modal = document.getElementById('smartAbsModal');
             if (!modal) {
                 modal = document.createElement('div');
@@ -1526,19 +1528,15 @@
                 document.body.appendChild(modal);
             }
 
-            // Gather Unique Dates
             let uniqueDates = [...new Set(scheduleCache.map(s => s.date))].sort((a,b) => new Date(a) - new Date(b));
             let dateOptions = uniqueDates.map(d => `<option value="${d}">${d.split('-').reverse().join('-')}</option>`).join('');
             
-            // Gather Rooms
             let roomOptions = roomConfigsCache.map(r => `<option value="${r.id}">${r.name} (${r.gender})</option>`).join('');
             
-            // Gather Classes
             let allClasses = new Set();
             roomConfigsCache.forEach(r => r.classesList.forEach(c => allClasses.add(String(c).toUpperCase().trim())));
             let classOptions = Array.from(allClasses).sort().map(c => `<option value="${c}">${c}</option>`).join('');
             
-            // Pre-select currently active date
             let actDate = document.getElementById('activeDate') ? document.getElementById('activeDate').value : '';
 
             modal.innerHTML = `
@@ -1591,75 +1589,89 @@
             
             if (!date) return alert("Select an exam date.");
 
-            // 1. Identify which classes actually have an exam on this date
-            let todaysSchedules = scheduleCache.filter(s => s.date === date && (!s.type || s.type === 'exam'));
-            let todaysClasses = new Set();
-            todaysSchedules.forEach(s => {
-                let sClasses = String(s.classes || '').split(/[\s,;]+/).map(x => x.toUpperCase().trim()).filter(Boolean);
-                sClasses.forEach(c => todaysClasses.add(c));
-            });
-
-            // 2. Fetch Daily Duty and Absentee Caches
             let safeAbsData = absenteesCache[date] || {};
             if(Array.isArray(safeAbsData)) safeAbsData = safeAbsData[0] || {};
+            
             let safeDutyData = dutyRecordsCache[date] || {};
             if(Array.isArray(safeDutyData)) safeDutyData = safeDutyData[0] || {};
 
-            let totalPupils = 0;
-            let totalAbsent = 0;
+            // Trackers for Date-wise, Class-wise, and Room-wise
+            let dateTotals = { alloc: 0, pres: 0, abs: 0 };
+            let classTotals = {};
             let tableRows = '';
 
-            // 3. Process Data strictly for today's exams
             roomConfigsCache.forEach(room => {
                 if (filterRoom !== 'ALL' && room.id !== filterRoom) return;
+
+                let absArr = safeAbsData[room.id] || [];
+                let invigs = (safeDutyData[room.id]?.invigs || []).filter(Boolean).join(', ') || '<span style="color:#ef4444; font-style:italic; font-size:11px;">Unassigned</span>';
 
                 let details = room.classDetails || [];
                 if (details.length === 0 && room.classesList) {
                     details = room.classesList.map(c => ({ className: c, rolls: "1-40", capacity: room.totalCapacity || 40 }));
                 }
 
-                let roomAbsentees = safeAbsData[room.id] || [];
-                let invigs = (safeDutyData[room.id]?.invigs || []).filter(Boolean).join(', ') || '<span style="color:#ef4444; font-style:italic; font-size:11px;">Unassigned</span>';
+                let absByClass = {};
+                absArr.forEach(uid => {
+                    let parts = uid.split('_');
+                    let cName = String(parts[0]).toUpperCase().trim();
+                    let rNum = parts[1];
+                    if(!absByClass[cName]) absByClass[cName] = [];
+                    absByClass[cName].push(rNum);
+                });
 
                 let roomHasData = false;
                 let roomHtmlTemp = '';
+                let roomAlloc = 0; let roomPres = 0; let roomAbs = 0;
 
                 details.forEach(cd => {
                     let cName = String(cd.className).toUpperCase().trim();
                     if (filterClass !== 'ALL' && cName !== filterClass) return;
-                    if (!todaysClasses.has(cName)) return; // Skip if this class doesn't have an exam today
 
                     let allocatedRolls = expandRolls(cd.rolls);
-                    if(allocatedRolls.length === 0) return;
+                    if(allocatedRolls.length === 0 && (!absByClass[cName] || absByClass[cName].length === 0)) return; 
 
-                    let classAllocCount = allocatedRolls.length;
-                    let clsAbs = roomAbsentees.filter(uid => uid.startsWith(cd.className + '_')).map(uid => uid.split('_')[1]).sort((a,b)=>parseInt(a)-parseInt(b));
-                    let classAbsCount = clsAbs.length;
+                    let cAlloc = allocatedRolls.length;
+                    let clsAbs = absByClass[cName] || [];
+                    let cAbs = clsAbs.length;
+                    let cPres = cAlloc - cAbs;
                     
-                    totalPupils += classAllocCount;
-                    totalAbsent += classAbsCount;
+                    // Add to Room Totals
+                    roomAlloc += cAlloc; roomPres += cPres; roomAbs += cAbs;
                     roomHasData = true;
 
-                    let absentDisplay = classAbsCount === 0 
+                    // Add to Global Date Totals
+                    dateTotals.alloc += cAlloc; dateTotals.pres += cPres; dateTotals.abs += cAbs;
+
+                    // Add to Class Totals
+                    if(!classTotals[cName]) classTotals[cName] = { alloc: 0, pres: 0, abs: 0 };
+                    classTotals[cName].alloc += cAlloc;
+                    classTotals[cName].pres += cPres;
+                    classTotals[cName].abs += cAbs;
+
+                    let sortedAbs = clsAbs.sort((a,b) => parseInt(a) - parseInt(b)).join(', ');
+                    let absentDisplay = cAbs === 0 
                         ? `<span style="color:#10b981; font-weight:bold;"><i class="fas fa-check-circle"></i> All Present</span>` 
-                        : `<span style="color:#b91c1c; font-weight:bold; letter-spacing:1px;">${clsAbs.join(', ')}</span>`;
+                        : `<span style="color:#b91c1c; font-weight:bold; letter-spacing:1px;">${sortedAbs}</span>`;
 
                     roomHtmlTemp += `
                         <tr>
-                            <td style="font-weight:bold; color:#1e293b;">Class ${cName}</td>
-                            <td style="text-align:center; font-weight:bold;">${classAllocCount}</td>
-                            <td style="text-align:center; font-weight:900; color:#b91c1c;">${classAbsCount}</td>
+                            <td style="font-weight:bold; color:#1e293b;">Class ${cd.className}</td>
+                            <td style="text-align:center; font-weight:bold;">${cAlloc}</td>
+                            <td style="text-align:center; font-weight:900; color:#10b981;">${cPres}</td>
+                            <td style="text-align:center; font-weight:900; color:#b91c1c;">${cAbs}</td>
                             <td>${absentDisplay}</td>
                         </tr>
                     `;
                 });
 
-                if (roomHasData) {
+                if (roomHasData || absArr.length > 0) {
                     tableRows += `
                         <tr style="background-color:#f1f5f9;">
-                            <td colspan="4" style="padding: 10px 15px;">
+                            <td colspan="5" style="padding: 10px 15px;">
                                 <div style="display:flex; justify-content:space-between; align-items:center;">
-                                    <span style="font-size:16px; font-weight:900;">Room ${room.name} <span style="font-size:12px; font-weight:normal; color:#64748b;">(${room.gender.toUpperCase()})</span></span>
+                                    <span style="font-size:15px; font-weight:900;">Room ${room.name} <span style="font-size:12px; font-weight:normal; color:#64748b;">(${String(room.gender).toUpperCase()})</span></span>
+                                    <span style="font-size:12px; font-weight:bold; color:#10b981;">Present: ${roomPres} &nbsp;|&nbsp; <span style="color:#e11d48;">Absent: ${roomAbs}</span> &nbsp;|&nbsp; <span style="color:#475569;">Total: ${roomAlloc}</span></span>
                                     <span style="font-size:12px; font-weight:bold; color:#475569;">Invigilators: <span style="color:#0f172a;">${invigs}</span></span>
                                 </div>
                             </td>
@@ -1669,51 +1681,50 @@
                 }
             });
 
-            if (totalPupils === 0) {
-                return alert("No students are allocated for exams on this date under the selected filters.");
-            }
+            if (tableRows === '') return alert("No data available for the selected filters.");
 
-            let totalPresent = totalPupils - totalAbsent;
-            let presentPct = Math.round((totalPresent / totalPupils) * 100);
-            let absentPct = 100 - presentPct;
+            // Build Class-wise Pie Charts
+            let classChartsHtml = '<div style="display: flex; flex-wrap: wrap; gap: 15px; margin-bottom: 25px; justify-content: center;">';
+            Object.keys(classTotals).sort().forEach(cName => {
+                let stats = classTotals[cName];
+                let pPct = stats.alloc > 0 ? Math.round((stats.pres / stats.alloc) * 100) : 0;
+                classChartsHtml += `
+                    <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px 15px; display: flex; align-items: center; gap: 12px; width: calc(33% - 15px); min-width: 210px; page-break-inside: avoid;">
+                        <div style="width: 45px; height: 45px; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 2px 4px rgba(0,0,0,0.1); background: conic-gradient(#10b981 0% ${pPct}%, #e11d48 ${pPct}% 100%); flex-shrink: 0;"></div>
+                        <div>
+                            <div style="font-weight: 900; font-size: 13px; color: #1e293b; margin-bottom: 4px;">CLASS ${cName}</div>
+                            <div style="font-size: 10px; font-weight: bold; color: #64748b; line-height: 1.4;">
+                                T: ${stats.alloc} | <span style="color:#10b981;">P: ${stats.pres} (${pPct}%)</span> | <span style="color:#e11d48;">A: ${stats.abs}</span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+            classChartsHtml += '</div>';
 
             let reportHTML = `<html><head><title>Smart Absentee Report</title><style>
                 @page { size: A4 portrait; margin: 15mm; }
                 body { font-family: 'Segoe UI', Arial, sans-serif; margin: 0; color: #0f172a; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
                 
-                /* Header Elements */
-                .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 4px solid #e11d48; padding-bottom: 15px; margin-bottom: 25px; }
+                .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 4px solid #e11d48; padding-bottom: 15px; margin-bottom: 20px; }
                 .school-info { flex: 1; text-align: center; }
                 .school-info h1 { margin: 0; font-size: 26px; text-transform: uppercase; color: #e11d48; font-weight: 900; letter-spacing: 1px; }
                 .school-info h2 { margin: 5px 0; font-size: 16px; text-decoration: underline; color: #1e293b; }
-                .school-info p { margin: 0; font-size: 13px; font-weight: bold; color: #64748b; }
                 .logo { width: 80px; height: 80px; object-fit: contain; }
                 
-                /* Dashboard Summary */
-                .dashboard { display: flex; justify-content: space-between; align-items: center; background: #f8fafc; padding: 15px 25px; border-radius: 12px; border: 1px solid #e2e8f0; margin-bottom: 25px; }
-                .stat-box { text-align: center; }
-                .stat-label { font-size: 11px; text-transform: uppercase; font-weight: bold; color: #64748b; letter-spacing: 0.5px; }
-                .stat-value { font-size: 28px; font-weight: 900; color: #0f172a; margin-top: 5px; }
-                .val-present { color: #10b981; }
-                .val-absent { color: #e11d48; }
-                
-                /* CSS Pie Chart */
-                .pie-container { display: flex; flex-direction: column; align-items: center; }
-                .pie-chart { width: 70px; height: 70px; border-radius: 50%; border: 3px solid #fff; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); background: conic-gradient(#10b981 0% ${presentPct}%, #e11d48 ${presentPct}% 100%); }
-                .pie-legend { font-size: 11px; font-weight: bold; margin-top: 8px; color: #334155; }
-                
-                /* Table Styles */
-                table { width: 100%; border-collapse: collapse; font-size: 14px; margin-bottom: 40px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
-                th, td { border: 1px solid #cbd5e1; padding: 10px 12px; }
+                .grand-total-bar { background: #0f172a; color: white; padding: 10px 20px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; font-weight: bold; margin-bottom: 15px; font-size: 14px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
+                .grand-total-bar span.hl-green { color: #34d399; }
+                .grand-total-bar span.hl-red { color: #fb7185; }
+
+                table { width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 40px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+                th, td { border: 1px solid #cbd5e1; padding: 8px 10px; }
                 th { background-color: #ffe4e6 !important; font-weight: 900; text-transform: uppercase; font-size: 12px; color: #9f1239; }
                 
-                /* Footer */
-                .signatures { display: flex; justify-content: space-between; margin-top: 60px; font-weight: bold; font-size: 14px; padding: 0 20px; }
+                .signatures { display: flex; justify-content: space-between; margin-top: 50px; font-weight: bold; font-size: 14px; padding: 0 20px; page-break-inside: avoid; }
                 .signatures div { border-top: 1px dashed #475569; padding-top: 8px; width: 220px; text-align: center; color: #334155; }
                 
                 @media print { .no-print { display: none !important; } }
             </style>
-            <!-- Include FontAwesome for icons -->
             <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
             </head><body>
             
@@ -1723,38 +1734,34 @@
                 <img src="https://raw.githubusercontent.com/mrinmoyedebnath-sys/mylogo/main/STH.png" crossorigin="anonymous" class="logo">
                 <div class="school-info">
                     <h1>${savedSchoolName}</h1>
-                    <h2>DAILY EXAM ABSENTEE REPORT</h2>
-                    <p>Exam Date: ${date.split('-').reverse().join('-')} &nbsp;|&nbsp; Filter: ${filterRoom === 'ALL' ? 'All Rooms' : 'Room ' + roomConfigsCache.find(r=>r.id===filterRoom).name} &nbsp;|&nbsp; ${filterClass === 'ALL' ? 'All Classes' : 'Class ' + filterClass}</p>
+                    <h2>SMART EXAM ABSENTEE REPORT</h2>
+                    <p style="margin: 0; font-size: 13px; font-weight: bold; color: #64748b; margin-top: 5px;">Date: ${date.split('-').reverse().join('-')} &nbsp;|&nbsp; Filter: ${filterRoom === 'ALL' ? 'All Rooms' : 'Room ' + roomConfigsCache.find(r=>r.id===filterRoom).name}</p>
                 </div>
                 <img src="https://raw.githubusercontent.com/mrinmoyedebnath-sys/mylogo/main/STH.png" crossorigin="anonymous" class="logo">
             </div>
 
-            <div class="dashboard">
-                <div class="stat-box">
-                    <div class="stat-label">Total Allocated</div>
-                    <div class="stat-value">${totalPupils}</div>
-                </div>
-                <div class="stat-box">
-                    <div class="stat-label">Total Present</div>
-                    <div class="stat-value val-present">${totalPresent}</div>
-                </div>
-                <div class="stat-box">
-                    <div class="stat-label">Total Absent</div>
-                    <div class="stat-value val-absent">${totalAbsent}</div>
-                </div>
-                <div class="pie-container">
-                    <div class="pie-chart"></div>
-                    <div class="pie-legend"><span style="color:#10b981;">■</span> Present ${presentPct}% &nbsp; <span style="color:#e11d48;">■</span> Absent ${absentPct}%</div>
+            <!-- Date-Wise Grand Totals -->
+            <div class="grand-total-bar">
+                <span>DATE-WISE GRAND TOTAL</span>
+                <div>
+                    Total Allocated: ${dateTotals.alloc} &nbsp;|&nbsp; 
+                    <span class="hl-green">Present: ${dateTotals.pres}</span> &nbsp;|&nbsp; 
+                    <span class="hl-red">Absent: ${dateTotals.abs}</span>
                 </div>
             </div>
 
+            <!-- Class-Wise Pie Charts -->
+            ${classChartsHtml}
+
+            <!-- Room-Wise and Class-Wise Data Table -->
             <table>
                 <thead>
                     <tr>
-                        <th style="width: 20%;">Class</th>
-                        <th style="width: 15%;">Total Pupil</th>
-                        <th style="width: 15%;">Abs Count</th>
-                        <th style="width: 50%; text-align: left;">Absentee Roll Numbers</th>
+                        <th style="width: 15%;">Class</th>
+                        <th style="width: 12%;">Total</th>
+                        <th style="width: 12%;">Present</th>
+                        <th style="width: 12%;">Absent</th>
+                        <th style="width: 49%; text-align: left;">Absentee Roll Numbers</th>
                     </tr>
                 </thead>
                 <tbody>
