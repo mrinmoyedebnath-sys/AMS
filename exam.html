@@ -1519,6 +1519,9 @@
       /* =====================================================
            FEATURE 5: SMART ABSENTEE REPORT & CLASS-WISE PIE CHARTS
         ==================================================== */
+       /* =====================================================
+           FEATURE 5: SMART ABSENTEE REPORT (MULTI-CLASS SELECT)
+        ==================================================== */
         function printAbsenteeReport() {
             let modal = document.getElementById('smartAbsModal');
             if (!modal) {
@@ -1535,7 +1538,25 @@
             
             let allClasses = new Set();
             roomConfigsCache.forEach(r => r.classesList.forEach(c => allClasses.add(String(c).toUpperCase().trim())));
-            let classOptions = Array.from(allClasses).sort().map(c => `<option value="${c}">${c}</option>`).join('');
+            let sortedClasses = Array.from(allClasses).sort();
+            
+            // Build Checkbox List for Classes
+            let classCheckboxesHtml = `
+                <div class="flex flex-col gap-2 max-h-40 overflow-y-auto custom-scroll p-2 border border-slate-300 rounded bg-white shadow-inner">
+                    <label class="flex items-center gap-2 text-xs font-bold text-slate-700 cursor-pointer p-1 hover:bg-rose-50 rounded transition-colors">
+                        <input type="checkbox" id="smartAbsClassAll" checked onchange="document.querySelectorAll('.smart-abs-class-chk').forEach(cb => cb.checked = this.checked)" class="w-4 h-4 text-rose-600 rounded"> 
+                        <span class="text-rose-600">-- Select All Classes --</span>
+                    </label>
+                    <div class="border-t border-slate-200 my-0.5"></div>
+            `;
+            sortedClasses.forEach(c => {
+                classCheckboxesHtml += `
+                    <label class="flex items-center gap-2 text-xs font-bold text-slate-700 cursor-pointer p-1 hover:bg-slate-50 rounded transition-colors">
+                        <input type="checkbox" value="${c}" checked class="smart-abs-class-chk w-4 h-4 text-rose-600 rounded focus:ring-rose-500"> Class ${c}
+                    </label>
+                `;
+            });
+            classCheckboxesHtml += `</div>`;
             
             let actDate = document.getElementById('activeDate') ? document.getElementById('activeDate').value : '';
 
@@ -1559,11 +1580,8 @@
                             </select>
                         </div>
                         <div>
-                            <label class="block text-xs font-bold text-slate-700 mb-1">Filter by Class (Optional):</label>
-                            <select id="smartAbsClass" class="w-full p-2.5 border border-slate-300 rounded font-bold text-slate-700 outline-none focus:border-rose-500 bg-slate-50">
-                                <option value="ALL">-- All Classes --</option>
-                                ${classOptions}
-                            </select>
+                            <label class="block text-xs font-bold text-slate-700 mb-1">Select Classes to Include:</label>
+                            ${classCheckboxesHtml}
                         </div>
                     </div>
                     
@@ -1585,9 +1603,13 @@
         function executeSmartAbsenteePrint() {
             const date = document.getElementById('smartAbsDate').value;
             const filterRoom = document.getElementById('smartAbsRoom').value;
-            const filterClass = document.getElementById('smartAbsClass').value;
             
+            // Read all checked classes
+            const checkedClasses = Array.from(document.querySelectorAll('.smart-abs-class-chk:checked')).map(cb => cb.value);
+            const totalClassesAvailable = document.querySelectorAll('.smart-abs-class-chk').length;
+
             if (!date) return alert("Select an exam date.");
+            if (checkedClasses.length === 0) return alert("Select at least one class to include in the report.");
 
             let safeAbsData = absenteesCache[date] || {};
             if(Array.isArray(safeAbsData)) safeAbsData = safeAbsData[0] || {};
@@ -1626,7 +1648,9 @@
 
                 details.forEach(cd => {
                     let cName = String(cd.className).toUpperCase().trim();
-                    if (filterClass !== 'ALL' && cName !== filterClass) return;
+                    
+                    // ONLY process this class if it was checked in the modal
+                    if (!checkedClasses.includes(cName)) return;
 
                     let allocatedRolls = expandRolls(cd.rolls);
                     if(allocatedRolls.length === 0 && (!absByClass[cName] || absByClass[cName].length === 0)) return; 
@@ -1665,7 +1689,7 @@
                     `;
                 });
 
-                if (roomHasData || absArr.length > 0) {
+                if (roomHasData) {
                     tableRows += `
                         <tr style="background-color:#f1f5f9;">
                             <td colspan="5" style="padding: 10px 15px;">
@@ -1702,6 +1726,9 @@
             });
             classChartsHtml += '</div>';
 
+            // Determine what to display in the header for "Filter: "
+            let printClassText = checkedClasses.length === totalClassesAvailable ? 'All Classes' : checkedClasses.join(', ');
+
             let reportHTML = `<html><head><title>Smart Absentee Report</title><style>
                 @page { size: A4 portrait; margin: 15mm; }
                 body { font-family: 'Segoe UI', Arial, sans-serif; margin: 0; color: #0f172a; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
@@ -1735,7 +1762,7 @@
                 <div class="school-info">
                     <h1>${savedSchoolName}</h1>
                     <h2>SMART EXAM ABSENTEE REPORT</h2>
-                    <p style="margin: 0; font-size: 13px; font-weight: bold; color: #64748b; margin-top: 5px;">Date: ${date.split('-').reverse().join('-')} &nbsp;|&nbsp; Filter: ${filterRoom === 'ALL' ? 'All Rooms' : 'Room ' + roomConfigsCache.find(r=>r.id===filterRoom).name}</p>
+                    <p style="margin: 0; font-size: 13px; font-weight: bold; color: #64748b; margin-top: 5px;">Date: ${date.split('-').reverse().join('-')} &nbsp;|&nbsp; Filter: ${filterRoom === 'ALL' ? 'All Rooms' : 'Room ' + roomConfigsCache.find(r=>r.id===filterRoom).name} &nbsp;|&nbsp; ${printClassText}</p>
                 </div>
                 <img src="https://raw.githubusercontent.com/mrinmoyedebnath-sys/mylogo/main/STH.png" crossorigin="anonymous" class="logo">
             </div>
@@ -1783,7 +1810,6 @@
             document.getElementById('smartAbsModal').classList.add('hidden');
             setTimeout(() => { w.print(); }, 800);
         }
-
         /* =====================================================
            PRINT: DYNAMIC ROOM SHEETS 
         ==================================================== */
