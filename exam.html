@@ -1726,12 +1726,11 @@
             });
             classChartsHtml += '</div>';
 
-            // Determine what to display in the header for "Filter: "
             let printClassText = checkedClasses.length === totalClassesAvailable ? 'All Classes' : checkedClasses.join(', ');
 
             let reportHTML = `<html><head><title>Smart Absentee Report</title><style>
                 @page { size: A4 portrait; margin: 15mm; }
-                body { font-family: 'Segoe UI', Arial, sans-serif; margin: 0; color: #0f172a; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+                body { font-family: 'Segoe UI', Arial, sans-serif; margin: 0; color: #0f172a; background: #ffffff; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
                 
                 .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 4px solid #e11d48; padding-bottom: 15px; margin-bottom: 20px; }
                 .school-info { flex: 1; text-align: center; }
@@ -1753,9 +1752,43 @@
                 @media print { .no-print { display: none !important; } }
             </style>
             <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+            <!-- Include html2canvas for JPG export -->
+            <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"><\/script>
+            <script>
+                function downloadJPG() {
+                    const btn = document.getElementById('btn-jpg');
+                    const originalHTML = btn.innerHTML;
+                    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
+                    
+                    setTimeout(() => {
+                        html2canvas(document.body, { 
+                            scale: 2, 
+                            useCORS: true, 
+                            backgroundColor: '#ffffff'
+                        }).then(canvas => {
+                            let link = document.createElement('a');
+                            link.download = 'Absentee_Report_${date}.jpg';
+                            link.href = canvas.toDataURL('image/jpeg', 0.9);
+                            link.click();
+                            btn.innerHTML = originalHTML;
+                        }).catch(err => {
+                            console.error(err);
+                            btn.innerHTML = originalHTML;
+                        });
+                    }, 500);
+                }
+            <\/script>
             </head><body>
             
-            <button class="no-print" onclick="window.print()" style="position:fixed; bottom:20px; right:20px; padding:15px 25px; background:#e11d48; color:white; font-size:16px; font-weight:bold; border:none; border-radius:8px; cursor:pointer; box-shadow:0 4px 6px rgba(0,0,0,0.3); z-index: 1000;">🖨️ Print Report</button>
+            <!-- Floating action buttons hidden from the JPG automatically -->
+            <div data-html2canvas-ignore="true" class="no-print" style="position:fixed; bottom:20px; right:20px; display:flex; gap:15px; z-index: 1000;">
+                <button id="btn-jpg" onclick="downloadJPG()" style="padding:15px 25px; background:#10b981; color:white; font-size:16px; font-weight:bold; border:none; border-radius:8px; cursor:pointer; box-shadow:0 4px 6px rgba(0,0,0,0.3); display:flex; align-items:center; gap:8px;">
+                    <i class="fas fa-file-image"></i> Download JPG
+                </button>
+                <button onclick="window.print()" style="padding:15px 25px; background:#e11d48; color:white; font-size:16px; font-weight:bold; border:none; border-radius:8px; cursor:pointer; box-shadow:0 4px 6px rgba(0,0,0,0.3); display:flex; align-items:center; gap:8px;">
+                    <i class="fas fa-print"></i> Print Report
+                </button>
+            </div>
             
             <div class="header">
                 <img src="https://raw.githubusercontent.com/mrinmoyedebnath-sys/mylogo/main/STH.png" crossorigin="anonymous" class="logo">
@@ -1808,7 +1841,6 @@
             w.document.write(reportHTML);
             w.document.close();
             document.getElementById('smartAbsModal').classList.add('hidden');
-            setTimeout(() => { w.print(); }, 800);
         }
         /* =====================================================
            PRINT: DYNAMIC ROOM SHEETS 
