@@ -52,7 +52,7 @@
         <p class="text-[10px] text-slate-500 font-bold mt-1">Fetching Routine, Exams, Leaves & Notices</p>
     </div>
 
-    <!-- TOP NAVIGATION HEADER -->
+    <!-- TOP window.addEventListener('DOMContentLoaded',IGATION HEADER -->
     <div class="bg-blue-800 text-white shadow-md p-3 flex flex-wrap justify-between items-center shrink-0 border-b-4 border-blue-500 no-print gap-2">
         <div class="flex items-center gap-2 md:gap-3">
             <div class="bg-white p-2 rounded-full shadow-inner hidden sm:block">
@@ -75,6 +75,16 @@
             </button>
         </div>
     </div>
+
+    <!-- PERSONALIZED WELCOME BANNER -->
+<div id="welcomeBanner" class="hidden bg-emerald-50 border-b border-emerald-200 p-3 md:p-4 flex justify-between items-center transition-opacity duration-500 shrink-0">
+    <div class="text-emerald-800 text-xs md:text-sm font-bold">
+        <i class="fas fa-hand-sparkles mr-2 text-emerald-500 text-lg"></i>
+        Welcome back, <span id="staffNameDisplay" class="font-black text-emerald-900 text-sm md:text-base">Staff Member</span>! 
+        <span class="block md:inline mt-1 md:mt-0 md:ml-2 font-medium text-emerald-700">Thank you for your dedication to the institution today.</span>
+    </div>
+    <button onclick="document.getElementById('welcomeBanner').style.display='none'" class="text-emerald-400 hover:text-emerald-600 text-xl font-black px-2 outline-none transition-colors">&times;</button>
+</div>
 
     <!-- MAIN DASHBOARD CONTENT -->
     <div class="p-2 md:p-6 max-w-7xl mx-auto w-full flex-1 flex flex-col gap-3 md:gap-4 overflow-y-auto">
@@ -1610,6 +1620,31 @@ if (keyStr === 'dutyRecords') {
             resBox.className = "mt-2 flex flex-col gap-2";
             resBox.innerHTML = resultHTML;
         }
+
+        // INITIALIZATION FOR STAFF.HTML
+        window.addEventListener('DOMContentLoaded', async () => {
+            
+            // 1. Fetch the logged-in staff member's name from storage
+            // (Make sure your login page saves the name using this key)
+            let currentStaffName = sessionStorage.getItem('staffName') || localStorage.getItem('staffName');
+
+            // 2. Inject the name and show the banner
+            const welcomeBanner = document.getElementById('welcomeBanner');
+            const nameDisplay = document.getElementById('staffNameDisplay');
+
+            if (currentStaffName && welcomeBanner && nameDisplay) {
+                nameDisplay.textContent = currentStaffName;
+                welcomeBanner.classList.remove('hidden');
+                
+                // Optional: Automatically fade out the banner after 8 seconds
+                setTimeout(() => {
+                    welcomeBanner.style.opacity = '0';
+                    setTimeout(() => welcomeBanner.style.display = 'none', 500); // Wait for fade transition
+                }, 8000);
+            }
+
+            // ... your existing initialization code continues below ...
+        });
     </script>
 </body>
 </html>
