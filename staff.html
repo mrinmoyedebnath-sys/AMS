@@ -38,6 +38,21 @@
             0% { transform: translateX(0); }
             100% { transform: translateX(-100%); }
         }
+
+
+        /* Welcome Screen Animations */
+        @keyframes floatNamaskar {
+            0%, 100% { transform: translateY(0px) scale(1); }
+            50% { transform: translateY(-15px) scale(1.05); }
+        }
+        .animate-float-namaskar { animation: floatNamaskar 3s ease-in-out infinite; }
+        
+        @keyframes sweetReveal {
+            0% { opacity: 0; transform: translateY(20px) scale(0.95); }
+            100% { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        .animate-sweet-reveal { animation: sweetReveal 1s cubic-bezier(0.2, 0.8, 0.2, 1) forwards; }
+        .delay-300 { animation-delay: 0.3s; opacity: 0; }
     </style>
 </head>
 <body class="bg-slate-50 h-screen flex flex-col overflow-hidden font-sans text-slate-800 text-xs md:text-sm">
@@ -50,6 +65,19 @@
         </div>
         <h2 class="text-blue-700 font-black text-sm tracking-wide">Syncing Staff Data...</h2>
         <p class="text-[10px] text-slate-500 font-bold mt-1">Fetching Routine, Exams, Leaves & Notices</p>
+    </div>
+
+    <!-- WELCOME OPENING SCREEN -->
+    <div id="welcome-screen" class="fixed inset-0 bg-gradient-to-br from-blue-900 via-indigo-900 to-slate-900 z-[9999999] flex flex-col justify-center items-center transition-opacity duration-1000 opacity-0 hidden no-print">
+        <div class="flex flex-col items-center animate-float-namaskar">
+            <i class="fas fa-praying-hands text-7xl md:text-8xl text-amber-400 mb-6 drop-shadow-[0_0_15px_rgba(251,191,36,0.5)]"></i>
+            <h1 class="text-3xl md:text-5xl font-black text-white tracking-tight animate-sweet-reveal text-center px-4">
+                Namaskar, <span id="welcomeScreenName" class="text-amber-400 drop-shadow-md">Staff</span>!
+            </h1>
+            <p class="text-blue-200 mt-4 text-sm md:text-lg font-medium tracking-wider animate-sweet-reveal delay-300 text-center px-4">
+                Wishing you a wonderful and productive day ahead ✨
+            </p>
+        </div>
     </div>
 
     <!-- TOP window.addEventListener('DOMContentLoaded',IGATION HEADER -->
@@ -76,15 +104,7 @@
         </div>
     </div>
 
-    <!-- PERSONALIZED WELCOME BANNER -->
-<div id="welcomeBanner" class="hidden bg-emerald-50 border-b border-emerald-200 p-3 md:p-4 flex justify-between items-center transition-opacity duration-500 shrink-0">
-    <div class="text-emerald-800 text-xs md:text-sm font-bold">
-        <i class="fas fa-hand-sparkles mr-2 text-emerald-500 text-lg"></i>
-        Welcome back, <span id="staffNameDisplay" class="font-black text-emerald-900 text-sm md:text-base">Staff Member</span>! 
-        <span class="block md:inline mt-1 md:mt-0 md:ml-2 font-medium text-emerald-700">Thank you for your dedication to the institution today.</span>
-    </div>
-    <button onclick="document.getElementById('welcomeBanner').style.display='none'" class="text-emerald-400 hover:text-emerald-600 text-xl font-black px-2 outline-none transition-colors">&times;</button>
-</div>
+
 
     <!-- MAIN DASHBOARD CONTENT -->
     <div class="p-2 md:p-6 max-w-7xl mx-auto w-full flex-1 flex flex-col gap-3 md:gap-4 overflow-y-auto">
@@ -521,7 +541,36 @@
             await fetchAllData(); 
             await initializeSubstitutionSync();
 
+// Hide loading overlay
             document.getElementById('loading-overlay').classList.add('hidden');
+
+            // Show Animated Welcome Screen
+            const welcomeScreen = document.getElementById('welcome-screen');
+            const welcomeName = document.getElementById('welcomeScreenName');
+            
+            if (welcomeScreen && welcomeName && currentStaffName) {
+                // Extract just the first name for a sweeter, more personal greeting
+                const firstName = currentStaffName.split(' ')[0];
+                welcomeName.innerText = firstName;
+                
+                welcomeScreen.classList.remove('hidden');
+                
+                // Trigger reflow to ensure CSS transitions work perfectly
+                void welcomeScreen.offsetWidth;
+                welcomeScreen.classList.remove('opacity-0');
+                welcomeScreen.classList.add('opacity-100');
+
+                // Fade out after 3.5 seconds
+                setTimeout(() => {
+                    welcomeScreen.classList.remove('opacity-100');
+                    welcomeScreen.classList.add('opacity-0');
+                    
+                    // Completely hide from DOM after fade out transition (1000ms)
+                    setTimeout(() => welcomeScreen.classList.add('hidden'), 1000);
+                }, 3500);
+            }
+
+            
         });
 
         function sanitizeName(name) {
@@ -1621,29 +1670,7 @@ if (keyStr === 'dutyRecords') {
             resBox.innerHTML = resultHTML;
         }
 
-        // INITIALIZATION FOR STAFF.HTML
-        window.addEventListener('DOMContentLoaded', async () => {
-            
-            // 1. Fetch the logged-in staff member's name from storage
-            // (Make sure your login page saves the name using this key)
-            let currentStaffName = sessionStorage.getItem('staffName') || localStorage.getItem('staffName');
-
-            // 2. Inject the name and show the banner
-            const welcomeBanner = document.getElementById('welcomeBanner');
-            const nameDisplay = document.getElementById('staffNameDisplay');
-
-            if (currentStaffName && welcomeBanner && nameDisplay) {
-                nameDisplay.textContent = currentStaffName;
-                welcomeBanner.classList.remove('hidden');
-                
-                // Optional: Automatically fade out the banner after 8 seconds
-                setTimeout(() => {
-                    welcomeBanner.style.opacity = '0';
-                    setTimeout(() => welcomeBanner.style.display = 'none', 500); // Wait for fade transition
-                }, 8000);
-            }
-
-            // ... your existing initialization code continues below ...
+       
         });
     </script>
 </body>
