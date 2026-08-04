@@ -39,7 +39,6 @@
             100% { transform: translateX(-100%); }
         }
 
-
         /* Welcome Screen Animations */
         @keyframes floatNamaskar {
             0%, 100% { transform: translateY(0px) scale(1); }
@@ -80,7 +79,7 @@
         </div>
     </div>
 
-    <!-- TOP window.addEventListener('DOMContentLoaded',IGATION HEADER -->
+    <!-- TOP NAVIGATION HEADER -->
     <div class="bg-blue-800 text-white shadow-md p-3 flex flex-wrap justify-between items-center shrink-0 border-b-4 border-blue-500 no-print gap-2">
         <div class="flex items-center gap-2 md:gap-3">
             <div class="bg-white p-2 rounded-full shadow-inner hidden sm:block">
@@ -103,8 +102,6 @@
             </button>
         </div>
     </div>
-
-
 
     <!-- MAIN DASHBOARD CONTENT -->
     <div class="p-2 md:p-6 max-w-7xl mx-auto w-full flex-1 flex flex-col gap-3 md:gap-4 overflow-y-auto">
@@ -150,7 +147,6 @@
             
             <!-- LEFT/MAIN COLUMN: EXAM DUTIES, ROUTINE & PROXY TABLE -->
             <div class="flex flex-col gap-4 lg:col-span-2 print-full-width">
-                
                 
                 <!-- MASTER ROUTINE (DYNAMIC DAY) -->
                 <div class="bg-white rounded-lg shadow-sm border border-slate-200 flex flex-col overflow-hidden shrink-0">
@@ -225,8 +221,6 @@
                         </table>
                     </div>
 
-
-
                     <!-- NEW: MY EXAM DUTIES -->
                 <div class="bg-white rounded-lg shadow-sm border border-slate-200 flex flex-col overflow-hidden border-t-4 border-indigo-500 shrink-0">
                     <div class="bg-indigo-50 p-2 md:p-3 border-b border-indigo-200 flex justify-between items-center shrink-0">
@@ -284,8 +278,7 @@
                     </div>
                 </div>
 
-<!-- STUDENT CHECKER -->
-<!-- STUDENT CHECKER -->
+                <!-- STUDENT CHECKER -->
                 <div class="bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden shrink-0 mb-4">
                     <div class="bg-cyan-50 p-2 md:p-3 border-b border-cyan-200 shrink-0 flex items-center">
                         <i class="fas fa-search text-cyan-600 mr-1.5"></i>
@@ -312,8 +305,6 @@
                     </div>
                 </div>
 
-
-                
                 <!-- LEAVE APPLICATION -->
                 <div class="bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden shrink-0">
                     <div class="bg-slate-50 p-2 md:p-3 border-b border-slate-200 shrink-0 flex justify-between items-center">
@@ -364,10 +355,9 @@
         </div>
     </div>
 
-    <!-- NEW: EXAM ABSENTEE ENTRY MODAL (Mobile Optimized) -->
+    <!-- EXAM ABSENTEE ENTRY MODAL -->
     <div id="examAbsenteeModal" class="fixed inset-0 bg-slate-900/80 z-[999999] hidden flex justify-center items-end md:items-center p-0 md:p-4 backdrop-blur-sm transition-opacity duration-300 no-print">
         <div class="bg-white md:rounded-xl shadow-2xl w-full max-w-2xl flex flex-col h-[90vh] md:max-h-[85vh] overflow-hidden border-t-4 border-rose-500 rounded-t-2xl">
-            <!-- Header -->
             <div class="px-4 py-3 border-b border-slate-200 flex justify-between items-center bg-rose-50 shrink-0">
                 <div>
                     <h2 class="text-sm md:text-base font-black text-rose-900 flex items-center">
@@ -380,12 +370,10 @@
                 </button>
             </div>
             
-            <!-- Dynamic Class Content -->
             <div id="examAbsenteeContent" class="p-3 overflow-y-auto flex-1 bg-slate-50 no-scrollbar pb-24">
                 <!-- Javascript will inject class-wise grids here -->
             </div>
             
-            <!-- Sticky Footer Save -->
             <div class="p-3 border-t bg-white shrink-0 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] z-20">
                 <button onclick="saveExamAbsentees(event)" id="btnSaveAbsentees" class="w-full bg-rose-600 hover:bg-rose-700 text-white font-black py-3 rounded-lg shadow-md transition-colors text-sm flex justify-center items-center focus:outline-none">
                     <i class="fas fa-save mr-2"></i> Save Absentees to Server
@@ -509,7 +497,7 @@
         // Caches for features
         let cachedRoutineData = [];
         let myAllExtraClasses = []; 
-        let scheduleCache = [];     // <--- ADD THIS LINE HERE
+        let scheduleCache = [];     
         let myLeaveRequests = []; 
         let schoolNotices = [];
         
@@ -541,7 +529,7 @@
             await fetchAllData(); 
             await initializeSubstitutionSync();
 
-// Hide loading overlay
+            // Hide loading overlay
             document.getElementById('loading-overlay').classList.add('hidden');
 
             // Show Animated Welcome Screen
@@ -569,20 +557,12 @@
                     setTimeout(() => welcomeScreen.classList.add('hidden'), 1000);
                 }, 3500);
             }
-
-            
         });
 
         function sanitizeName(name) {
             return String(name || '').replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
         }
 
-        /* =====================================================
-           UNIFIED DATA FETCH (ROUTINE + SUBSTITUTION + EXAMS + LEAVES + NOTICES)
-        ===================================================== */
-        /* =====================================================
-           UNIFIED DATA FETCH (ROUTINE + SUBSTITUTION + EXAMS + LEAVES + NOTICES)
-        ===================================================== */
         async function fetchAllData() {
             try {
                 if (!dbClient) throw new Error("Database client not found. Check supabase-config.js");
@@ -662,16 +642,13 @@
 
                         // 5. Fetch Exam Infrastructure
                         if (keyStr === 'roomConfigs') roomConfigsCache = Array.isArray(payload) ? payload : Object.values(payload || {});
-if (keyStr === 'dutyRecords') {
-                            // SANITIZE: Unwrap array if it was saved incorrectly in the past
+                        if (keyStr === 'dutyRecords') {
                             if (Array.isArray(payload)) dutyRecordsCache = payload[0] || {};
                             else dutyRecordsCache = payload || {};
                         }
 
-                        
-                        if (keyStr === 'schedule') scheduleCache = Array.isArray(payload) ? payload : Object.values(payload || {}); // <--- NEW: FETCHES SCHEDULE
-                       if (keyStr === 'absentees') {
-                            // SANITIZE: Unwrap array if it was saved incorrectly in the past
+                        if (keyStr === 'schedule') scheduleCache = Array.isArray(payload) ? payload : Object.values(payload || {}); 
+                        if (keyStr === 'absentees') {
                             if (Array.isArray(payload)) absenteesCache = payload[0] || {};
                             else absenteesCache = payload || {};
                             recordIds.absentees = row.id;
@@ -679,12 +656,10 @@ if (keyStr === 'dutyRecords') {
                     });
                 }
 
-                // Render all modules
                 renderSelectedRoutine();
                 renderExamDuties();
                 calculateAndRenderLeaveBalances();
                 renderNoticeBoard();
-
                 populateStudentCheckerDropdowns();
 
                 myAllExtraClasses = allAssignments.filter(duty => {
@@ -693,7 +668,7 @@ if (keyStr === 'dutyRecords') {
                     return subClean === staffNameClean || absClean === staffNameClean;
                 });
                 
-                myAllExtraClasses.sort((a, b) => new Date(b.date) - new Date(a.date)); // Newest first
+                myAllExtraClasses.sort((a, b) => new Date(b.date) - new Date(a.date)); 
 
                 const today = new Date();
                 const todayISO = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
@@ -714,22 +689,12 @@ if (keyStr === 'dutyRecords') {
             }
         }
 
-        /* =====================================================
-           EXAM DUTIES RENDERING
-        ===================================================== */
-        /* =====================================================
-           EXAM DUTIES RENDERING (WITH DYNAMIC SCHEDULE FIX)
-        ===================================================== */
-       /* =====================================================
-           EXAM DUTIES RENDERING (WITH DYNAMIC SCHEDULE FIX)
-        ===================================================== */
         function getExamDetailsForRoom(date, roomConf) {
             let defaultMeta = { time: 'N/A', examName: 'Examination', subject: 'N/A' };
             if(!roomConf || !roomConf.classesList || scheduleCache.length === 0) return defaultMeta;
             
             let todaysSchedules = scheduleCache.filter(s => s.date === date);
             
-            // Smarter matching: Combine all subjects that are happening in this room
             let matchingScheds = todaysSchedules.filter(s => {
                 let sClasses = s.classes.split(/[\s,;]+/).filter(Boolean).map(c => c.trim().toUpperCase());
                 return sClasses.some(c => roomConf.classesList.map(rc => rc.trim().toUpperCase()).includes(c));
@@ -753,7 +718,6 @@ if (keyStr === 'dutyRecords') {
             const staffClean = sanitizeName(currentStaffName);
 
             Object.keys(dutyRecordsCache).forEach(date => {
-                // Safety check to ignore root-level metadata keys
                 if (date === 'meta' || date === 'excluded') return; 
 
                 const dayRec = dutyRecordsCache[date];
@@ -795,7 +759,7 @@ if (keyStr === 'dutyRecords') {
             myDuties.sort((a, b) => {
                 let dA = new Date(a.date);
                 let dB = new Date(b.date);
-                if (dA.getTime() !== dB.getTime()) return dB - dA; // Descending (newest first)
+                if (dA.getTime() !== dB.getTime()) return dB - dA; 
                 return a.time.localeCompare(b.time);
             });
 
@@ -855,9 +819,7 @@ if (keyStr === 'dutyRecords') {
             });
             tbody.innerHTML = html;
         }
-        /* =====================================================
-           EXAM ABSENTEE ENTRY MODAL & AUTO-CALCULATOR
-        ===================================================== */
+
         let currExamDate = null;
         let currExamRoom = null;
         let tempExamAbs = [];
@@ -892,11 +854,9 @@ if (keyStr === 'dutyRecords') {
             container.innerHTML = '';
             classRollStats = {};
 
-            // Hide/Show Save button based on lock status
             const saveBtn = document.getElementById('btnSaveAbsentees');
             if (isLocked) {
                 saveBtn.classList.add('hidden');
-                // Create a sticky alert at the top of the content
                 container.innerHTML = `
                     <div class="bg-amber-100 border border-amber-300 text-amber-900 px-4 py-3 rounded-lg mb-4 text-xs font-bold flex items-center shadow-sm">
                         <i class="fas fa-lock mr-2 text-base text-amber-600"></i> The Administrator has locked absentee entry for this date. View-only mode active.
@@ -955,18 +915,15 @@ if (keyStr === 'dutyRecords') {
             const idx = tempExamAbs.indexOf(uid);
             const safeClass = className.replace(/\s+/g, '');
             if (idx > -1) {
-                // Was absent, now present
                 tempExamAbs.splice(idx, 1);
                 btnEl.className = `w-10 h-10 md:w-12 md:h-12 rounded-lg border-2 font-black text-xs md:text-sm flex justify-center items-center transition-all focus:outline-none bg-slate-50 text-slate-700 border-slate-300 shadow-sm hover:bg-slate-100 cursor-pointer active:scale-95`;
                 classRollStats[className].absent--;
             } else {
-                // Was present, now absent
                 tempExamAbs.push(uid);
                 btnEl.className = `w-10 h-10 md:w-12 md:h-12 rounded-lg border-2 font-black text-xs md:text-sm flex justify-center items-center transition-all focus:outline-none bg-rose-500 text-white border-rose-600 shadow-inner scale-[0.97] cursor-pointer`;
                 classRollStats[className].absent++;
             }
             
-            // Update Stats Live
             document.getElementById(`abs-stat-${safeClass}`).innerText = `Absent: ${classRollStats[className].absent}`;
             document.getElementById(`pres-stat-${safeClass}`).innerText = `Present: ${classRollStats[className].total - classRollStats[className].absent}`;
         }
@@ -988,7 +945,7 @@ if (keyStr === 'dutyRecords') {
                     if(data) recordIds.absentees = data[0].id;
                 }
                 closeExamAbsenteeModal();
-                renderExamDuties(); // Refresh the list to update badges
+                renderExamDuties(); 
             } catch (e) {
                 alert("Failed to save absentees. Please check your internet connection.");
             } finally {
@@ -1001,9 +958,6 @@ if (keyStr === 'dutyRecords') {
             document.getElementById('examAbsenteeModal').classList.add('hidden');
         }
 
-        /* =====================================================
-           DYNAMIC DAY ROUTINE RENDERING
-        ===================================================== */
         function renderSelectedRoutine() {
             const selectedDay = document.getElementById('routineDaySelect').value;
             const tbody = document.getElementById('teacherDashRoutineBody');
@@ -1049,9 +1003,6 @@ if (keyStr === 'dutyRecords') {
             document.getElementById('metricTotalClasses').innerText = dayClassesCount;
         }
 
-        /* =====================================================
-           NOTICE BOARD RENDERING
-        ===================================================== */
         function renderNoticeBoard() {
             const container = document.getElementById('noticeBoardContainer');
             container.innerHTML = '';
@@ -1077,9 +1028,6 @@ if (keyStr === 'dutyRecords') {
             });
         }
 
-        /* =====================================================
-           LEAVE BALANCES & REGISTER MODAL
-        ===================================================== */
         function calculateAndRenderLeaveBalances() {
             let clTaken = 0;
             let mlTaken = 0;
@@ -1158,9 +1106,6 @@ if (keyStr === 'dutyRecords') {
             document.getElementById('leaveRegisterModal').classList.add('hidden');
         }
 
-        /* =====================================================
-           MODAL LOGIC (EXTRA CLASSES WITH DATE FILTER)
-        ===================================================== */
         function openExtraClassModal() {
             const modal = document.getElementById('extraClassModal');
             const tbody = document.getElementById('extraClassModalBody');
@@ -1186,6 +1131,9 @@ if (keyStr === 'dutyRecords') {
             } else {
                 let html = '';
                 const staffClean = sanitizeName(currentStaffName);
+                
+                let proxyCount = 0;
+                let absentCount = 0;
 
                 filteredClasses.forEach(duty => {
                     let date = duty.date || 'Unknown Date';
@@ -1200,9 +1148,11 @@ if (keyStr === 'dutyRecords') {
                     let counterpart = '';
 
                     if (subClean === staffClean) {
+                        proxyCount++;
                         roleBadge = '<span class="bg-emerald-100 text-emerald-800 border border-emerald-300 px-1.5 py-0.5 rounded text-[9px] font-black uppercase">Substitute</span>';
                         counterpart = `Covering for: <b>${duty.absentTeacher}</b>`;
                     } else if (absClean === staffClean) {
+                        absentCount++;
                         roleBadge = '<span class="bg-red-100 text-red-800 border border-red-300 px-1.5 py-0.5 rounded text-[9px] font-black uppercase">Absent</span>';
                         counterpart = `Covered by: <b>${duty.substituteTeacher}</b>`;
                     }
@@ -1224,6 +1174,16 @@ if (keyStr === 'dutyRecords') {
                         </tr>
                     `;
                 });
+                
+                html = `
+                    <tr class="bg-blue-100">
+                        <td colspan="6" class="p-2 text-center text-[10px] md:text-xs font-black text-blue-900 border-b border-blue-300 shadow-sm">
+                            <span class="mr-4"><i class="fas fa-check-circle text-emerald-600 mr-1"></i> Total Proxies Undertaken: <span class="text-emerald-700 text-sm">${proxyCount}</span></span>
+                            <span><i class="fas fa-times-circle text-red-600 mr-1"></i> Total Days Absent: <span class="text-red-700 text-sm">${absentCount}</span></span>
+                        </td>
+                    </tr>
+                ` + html;
+                
                 tbody.innerHTML = html;
             }
             modal.classList.remove('hidden');
@@ -1233,9 +1193,6 @@ if (keyStr === 'dutyRecords') {
             document.getElementById('extraClassModal').classList.add('hidden');
         }
 
-        /* =====================================================
-           RENDER TICKER & DASHBOARD WINDOW
-        ===================================================== */
         function renderSubstitutionTicker(duties, hasError = false) {
             const track = document.getElementById('substitutionTickerTrack');
             if (!track) return;
@@ -1336,9 +1293,6 @@ if (keyStr === 'dutyRecords') {
                 .subscribe();
         }
 
-        /* =====================================================
-           LEAVE APPLICATION & LOGOUT
-        ===================================================== */
         async function submitLeaveApplication() {
             const start = document.getElementById('leaveStart').value;
             const end = document.getElementById('leaveEnd').value;
@@ -1463,94 +1417,6 @@ if (keyStr === 'dutyRecords') {
             window.location.href = 'index.html';
         }
 
-        /* =====================================================
-           MODAL LOGIC (EXTRA CLASSES & PROXY CALCULATION)
-        ===================================================== */
-        function openExtraClassModal() {
-            const modal = document.getElementById('extraClassModal');
-            const tbody = document.getElementById('extraClassModalBody');
-            
-            const startDateStr = document.getElementById('proxyFilterStart').value;
-            const endDateStr = document.getElementById('proxyFilterEnd').value;
-            
-            tbody.innerHTML = '';
-
-            let filteredClasses = [...myAllExtraClasses];
-
-            if (startDateStr && endDateStr) {
-                const filterStart = new Date(startDateStr);
-                const filterEnd = new Date(endDateStr);
-                filteredClasses = filteredClasses.filter(duty => {
-                    const dutyDate = new Date(duty.date);
-                    return (dutyDate >= filterStart && dutyDate <= filterEnd);
-                });
-            }
-
-            if (filteredClasses.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="6" class="p-6 text-slate-400 font-semibold italic text-[10px] md:text-xs">No extra classes found for the selected dates.</td></tr>`;
-            } else {
-                let html = '';
-                const staffClean = sanitizeName(currentStaffName);
-                
-                let proxyCount = 0;
-                let absentCount = 0;
-
-                filteredClasses.forEach(duty => {
-                    let date = duty.date || 'Unknown Date';
-                    let period = duty.period || 'Assigned';
-                    let cls = duty.class || 'N/A';
-                    let subject = duty.subject || '-';
-                    
-                    const subClean = sanitizeName(duty.substituteTeacher);
-                    const absClean = sanitizeName(duty.absentTeacher);
-                    
-                    let roleBadge = '';
-                    let counterpart = '';
-
-                    if (subClean === staffClean) {
-                        proxyCount++;
-                        roleBadge = '<span class="bg-emerald-100 text-emerald-800 border border-emerald-300 px-1.5 py-0.5 rounded text-[9px] font-black uppercase">Substitute</span>';
-                        counterpart = `Covering for: <b>${duty.absentTeacher}</b>`;
-                    } else if (absClean === staffClean) {
-                        absentCount++;
-                        roleBadge = '<span class="bg-red-100 text-red-800 border border-red-300 px-1.5 py-0.5 rounded text-[9px] font-black uppercase">Absent</span>';
-                        counterpart = `Covered by: <b>${duty.substituteTeacher}</b>`;
-                    }
-
-                    const today = new Date();
-                    const todayISO = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
-                    const isToday = (date === todayISO);
-                    
-                    const rowClass = isToday ? 'bg-amber-50 hover:bg-amber-100 font-bold border-l-4 border-l-amber-500' : 'hover:bg-slate-50';
-
-                    html += `
-                        <tr class="border-b border-slate-200 transition-colors ${rowClass}">
-                            <td class="p-2 text-slate-700 whitespace-nowrap">${date} ${isToday ? '<span class="ml-1 text-[8px] bg-amber-500 text-white px-1 py-0.5 rounded">Today</span>' : ''}</td>
-                            <td class="p-2">${roleBadge}</td>
-                            <td class="p-2 text-blue-900 font-bold">${period}</td>
-                            <td class="p-2 text-slate-900 font-black whitespace-nowrap">Class ${cls}</td>
-                            <td class="p-2 text-slate-600">${subject}</td>
-                            <td class="p-2 text-slate-600 text-[10px] md:text-xs">${counterpart}</td>
-                        </tr>
-                    `;
-                });
-                
-                // Add the calculation banner at the top of the table
-                html = `
-                    <tr class="bg-blue-100">
-                        <td colspan="6" class="p-2 text-center text-[10px] md:text-xs font-black text-blue-900 border-b border-blue-300 shadow-sm">
-                            <span class="mr-4"><i class="fas fa-check-circle text-emerald-600 mr-1"></i> Total Proxies Undertaken: <span class="text-emerald-700 text-sm">${proxyCount}</span></span>
-                            <span><i class="fas fa-times-circle text-red-600 mr-1"></i> Total Days Absent: <span class="text-red-700 text-sm">${absentCount}</span></span>
-                        </td>
-                    </tr>
-                ` + html;
-                
-                tbody.innerHTML = html;
-            }
-            modal.classList.remove('hidden');
-        }
-
-
         function populateStudentCheckerDropdowns() {
             const dateSelect = document.getElementById('checkStudDate');
             const classSelect = document.getElementById('checkStudClass');
@@ -1565,12 +1431,7 @@ if (keyStr === 'dutyRecords') {
             let classOptions = '<option value="">-- Class --</option>' + Array.from(allClasses).sort().map(c => `<option value="${c}">${c}</option>`).join('');
             classSelect.innerHTML = classOptions;
         }
-        /* =====================================================
-           STUDENT CHECKER LOGIC
-        ===================================================== */
-        /* =====================================================
-           STUDENT CHECKER LOGIC (SUPPORTING GIRLS & BOYS)
-        ===================================================== */
+
         function checkStudentStatus() {
             const d = document.getElementById('checkStudDate').value;
             const c = document.getElementById('checkStudClass').value.trim().toUpperCase();
@@ -1590,12 +1451,10 @@ if (keyStr === 'dutyRecords') {
             for (let room of roomConfigsCache) {
                 let roomGender = String(room.gender || '').trim().toUpperCase();
                 
-                // If a specific gender is selected, skip non-matching rooms
                 if (g && roomGender && roomGender !== g && roomGender !== 'MIXED') {
                     continue;
                 }
 
-                // Safety fallback if classDetails is missing/empty
                 let details = room.classDetails || [];
                 if (details.length === 0 && room.classesList) {
                     details = room.classesList.map(clsName => ({ className: clsName, rolls: "1-200" }));
@@ -1670,8 +1529,6 @@ if (keyStr === 'dutyRecords') {
             resBox.innerHTML = resultHTML;
         }
 
-       
-        });
     </script>
 </body>
 </html>
